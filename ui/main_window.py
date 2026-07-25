@@ -8,9 +8,10 @@ from PyQt5.QtWidgets import (
     QFileDialog, QMessageBox, QLineEdit, QTextBrowser,
     QFrame, QSizePolicy, QAbstractItemView, QTabWidget,
     QPushButton, QTabBar, QPlainTextEdit, QStackedWidget,
+    QMenu, QAction,
 )
 from PyQt5.QtCore import Qt, QUrl, QTimer, QMimeData
-from PyQt5.QtGui import QFont, QColor, QPalette, QDragEnterEvent, QDropEvent
+from PyQt5.QtGui import QFont, QColor, QPalette, QDragEnterEvent, QDropEvent, QDesktopServices
 
 from utils.xml_parser import XMLParser
 
@@ -55,11 +56,32 @@ def _save_config(cfg):
 
 # ── MainWindow ────────────────────────────────────────────────
 
+def _read_version():
+    """Read version string from version.txt."""
+    candidates = [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'version.txt'),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'version.txt'),
+    ]
+    if getattr(sys, 'frozen', False):
+        candidates.insert(0, os.path.join(os.path.dirname(sys.executable), 'version.txt'))
+    for p in candidates:
+        if os.path.exists(p):
+            try:
+                with open(p, 'r', encoding='utf-8') as f:
+                    v = f.read().strip()
+                    if v:
+                        return v
+            except Exception:
+                pass
+    return '1.0'
+
+
 class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('数据库设计查看器')
+        self._version = _read_version()
+        self.setWindowTitle(f'数据库设计查看器 V{self._version}')
         self.setGeometry(60, 40, 1400, 900)
         self.setAcceptDrops(True)
 
@@ -94,6 +116,8 @@ class MainWindow(QMainWindow):
         self.tab_widget.tabCloseRequested.connect(self._close_tab)
         self.tab_widget.currentChanged.connect(self._on_tab_changed)
         self.tab_widget.setDocumentMode(True)
+        self.tab_widget.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tab_widget.customContextMenuRequested.connect(self._tab_context_menu)
         root.addWidget(self.tab_widget, 1)
 
     def _build_header(self):
@@ -102,13 +126,19 @@ class MainWindow(QMainWindow):
         frame.setFixedHeight(56)
         h = QHBoxLayout(frame)
         h.setContentsMargins(24, 0, 24, 0)
-        title = QLabel('📊 数据库设计查看器')
+        title = QLabel(f'📊 数据库设计查看器 V{self._version}')
         title.setObjectName('headerTitle')
         sub = QLabel('支持拖拽文件/文件夹')
         sub.setObjectName('headerSub')
         h.addWidget(title)
         h.addSpacing(16)
         h.addWidget(sub, 1, Qt.AlignVCenter)
+        github_link = QLabel('<a href="https://github.com/hp6120c/xml-viewer" '
+                             'style="color:rgba(255,255,255,0.85);text-decoration:none;font-size:11px;">'
+                             'https://github.com/hp6120c/xml-viewer</a>')
+        github_link.setOpenExternalLinks(True)
+        github_link.setCursor(Qt.PointingHandCursor)
+        h.addWidget(github_link, 0, Qt.AlignVCenter)
         return frame
 
     def _build_toolbar(self):
@@ -467,6 +497,112 @@ class MainWindow(QMainWindow):
         self._update_stats()
         self._update_info_label()
 
+    def _tab_context_menu(self, pos):
+        """Right-click context menu on tab bar."""
+        bar = self.tab_widget.tabBar()
+        tab_idx = bar.tabAt(pos)
+        if tab_idx < 0:
+            return
+
+        menu = QMenu(self)
+        menu.setStyleSheet('QMenu { padding: 4px 8px; } QMenu::item { padding: 4px 20px; }')
+
+        act_close_right = menu.addAction('关闭右侧标签页')
+        act_close_others = menu.addAction('关闭其他标签页')
+        act_close_all = menu.addAction('关闭所有标签页')
+
+        action = menu.exec_(bar.mapToGlobal(pos))
+        if action == act_close_right:
+            self._close_tabs_to_right(tab_idx)
+        elif action == act_close_others:
+            self._close_other_tabs(tab_idx)
+        elif action == act_close_all:
+            self._close_all_tabs()
+
+    def _close_tabs_to_right(self, from_index):
+        """Close all tabs to the right of from_index."""
+        if from_index >= self.tab_widget.count() - 1:
+            return
+        count = self.tab_widget.count() - 1 - from_index
+        names = []
+        for i in range(from_index + 1, self.tab_widget.count()):
+            tab = self.tab_widget.widget(i)
+            if hasattr(tab, '_file_path'):
+                names.append(os.path.basename(tab._file_path))
+        if not names:
+            return
+        preview = '、'.join(names[:5])
+        if len(names) > 5:
+            preview += f' 等 {len(names)} 个文件'
+        reply = QMessageBox.question(
+            self, '确认关闭',
+            f'确定要关闭右侧 {count} 个标签页吗？\n\n{preview}',
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+        for i in range(self.tab_widget.count() - 1, from_index, -1):
+            tab = self.tab_widget.widget(i)
+            if hasattr(tab, '_file_path'):
+                fp = tab._file_path
+                self._file_data.pop(fp, None)
+                self._file_tables.pop(fp, None)
+            self.tab_widget.removeTab(i)
+        self._update_stats()
+        self._update_info_label()
+
+    def _close_other_tabs(self, keep_index):
+        """Close all tabs except the one at keep_index."""
+        if self.tab_widget.count() <= 1:
+            return
+        names = []
+        for i in range(self.tab_widget.count()):
+            if i != keep_index:
+                tab = self.tab_widget.widget(i)
+                if hasattr(tab, '_file_path'):
+                    names.append(os.path.basename(tab._file_path))
+        if not names:
+            return
+        preview = '、'.join(names[:5])
+        if len(names) > 5:
+            preview += f' 等 {len(names)} 个文件'
+        reply = QMessageBox.question(
+            self, '确认关闭',
+            f'确定要关闭以下标签页吗？\n\n{preview}',
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+
+        # Close from end to start to keep indices valid
+        for i in range(self.tab_widget.count() - 1, -1, -1):
+            if i != keep_index:
+                tab = self.tab_widget.widget(i)
+                if hasattr(tab, '_file_path'):
+                    fp = tab._file_path
+                    self._file_data.pop(fp, None)
+                    self._file_tables.pop(fp, None)
+                self.tab_widget.removeTab(i)
+        self._update_stats()
+        self._update_info_label()
+
+    def _close_all_tabs(self):
+        """Close all tabs."""
+        if self.tab_widget.count() == 0:
+            return
+        reply = QMessageBox.question(
+            self, '确认关闭',
+            f'确定要关闭所有 {self.tab_widget.count()} 个标签页吗？',
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+        self.tab_widget.clear()
+        self._file_data.clear()
+        self._file_tables.clear()
+        self._update_stats()
+        self._update_info_label()
+
     def _toggle_edit_mode(self, checked):
         """Toggle between read mode and edit mode for the current tab."""
         idx = self.tab_widget.currentIndex()
@@ -479,7 +615,7 @@ class MainWindow(QMainWindow):
             return
 
         if checked:
-            # Switch to edit mode: load raw XML into editor
+            # Enter edit mode: load selected table's XML or full file
             fp = tab._file_path
             try:
                 try:
@@ -488,37 +624,67 @@ class MainWindow(QMainWindow):
                 except UnicodeDecodeError:
                     with open(fp, 'r', encoding='gbk') as f:
                         raw = f.read()
-                tab._editor.setPlainText(raw)
             except Exception as e:
                 QMessageBox.warning(self, '错误', f'读取文件失败:\n{e}')
                 self.btn_edit_mode.setChecked(False)
                 return
+
+            # If a table is selected, extract only that table's XML
+            table_id = getattr(tab, '_viewing_table_id', None)
+            if table_id:
+                tab_content = self._extract_table_xml(raw, table_id)
+                if tab_content:
+                    tab._editing_table_id = table_id
+                    tab._editor.setPlainText(tab_content)
+                else:
+                    tab._editing_table_id = None
+                    tab._editor.setPlainText(raw)
+            else:
+                tab._editing_table_id = None
+                tab._editor.setPlainText(raw)
+
             tab._stack.setCurrentIndex(2)  # editor
-
-            # Try to scroll editor to the position user was viewing
-            self._sync_scroll_to_editor(tab)
-
             self.btn_edit_mode.setText('👁️ 阅读模式')
         else:
-            # Switch to read mode: save and re-render
+            # Exit edit mode: save and re-render
             fp = tab._file_path
             new_content = tab._editor.toPlainText()
-            try:
-                with open(fp, 'w', encoding='utf-8') as f:
-                    f.write(new_content)
-            except Exception as e:
-                QMessageBox.warning(self, '错误', f'保存文件失败:\n{e}')
-                return
+
+            # If editing a single table, replace only that table in the full file
+            editing_tid = getattr(tab, '_editing_table_id', None)
+            if editing_tid:
+                try:
+                    try:
+                        with open(fp, 'r', encoding='utf-8') as f:
+                            full_raw = f.read()
+                    except UnicodeDecodeError:
+                        with open(fp, 'r', encoding='gbk') as f:
+                            full_raw = f.read()
+                    merged = self._replace_table_xml(full_raw, editing_tid, new_content)
+                    with open(fp, 'w', encoding='utf-8') as f:
+                        f.write(merged)
+                except Exception as e:
+                    QMessageBox.warning(self, '错误', f'保存文件失败:\n{e}')
+                    return
+            else:
+                try:
+                    with open(fp, 'w', encoding='utf-8') as f:
+                        f.write(new_content)
+                except Exception as e:
+                    QMessageBox.warning(self, '错误', f'保存文件失败:\n{e}')
+                    return
+
             # Re-parse and refresh
             data = XMLParser.parse_file(fp)
             if data:
                 self._file_data[fp] = data
                 tables = XMLParser.get_all_tables(data)
                 self._file_tables[fp] = tables
-                tab._html_loaded = False  # force re-render on next view
+                tab._html_loaded = False
+                tab._editing_table_id = None
+
             tab._stack.setCurrentIndex(0)
-            # Trigger re-render now
-            if hasattr(tab, '_html_loaded') and not tab._html_loaded:
+            if not tab._html_loaded:
                 fp2 = tab._file_path
                 d = self._file_data.get(fp2)
                 t = self._file_tables.get(fp2, [])
@@ -527,35 +693,22 @@ class MainWindow(QMainWindow):
                 tab._html_loaded = True
             self.btn_edit_mode.setText('✏️ 编辑模式')
 
-    def _sync_scroll_to_editor(self, tab):
-        """Scroll the editor to match the position the user was viewing."""
-        cursor = tab._editor.textCursor()
-        # Check if user was viewing a specific table detail
-        if hasattr(tab, '_viewing_table_id') and tab._viewing_table_id:
-            table_id = tab._viewing_table_id
-            raw = tab._editor.toPlainText()
-            # Find the table element in the XML
-            search = f'id="{table_id}"'
-            pos = raw.find(search)
-            if pos == -1:
-                search = f"id=\"{table_id}\""
-                pos = raw.find(search)
-            if pos >= 0:
-                # Move cursor to that position
-                cursor.setPosition(pos)
-                tab._editor.setTextCursor(cursor)
-                tab._editor.ensureCursorVisible()
-                return
-        # Fallback: proportional scroll based on browser scrollbar
-        if tab._stack.currentIndex() == 2:
-            # Was viewing detail or overview
-            browser = tab._detail_browser if hasattr(tab, '_detail_browser') else None
-            if browser:
-                sb = browser.verticalScrollBar()
-                if sb.maximum() > 0:
-                    ratio = sb.value() / sb.maximum()
-                    editor_sb = tab._editor.verticalScrollBar()
-                    editor_sb.setValue(int(ratio * editor_sb.maximum()))
+    def _extract_table_xml(self, full_xml, table_id):
+        """Extract the XML block for a specific table from the full XML."""
+        import re
+        # Match <table id="TABLE_ID">...</table> (with optional whitespace/newlines)
+        pattern = r'(<table\s+[^>]*id\s*=\s*["\']' + re.escape(table_id) + r'["\'][^>]*>)(.*?)(</table>)'
+        match = re.search(pattern, full_xml, re.DOTALL | re.IGNORECASE)
+        if match:
+            return match.group(0)
+        return None
+
+    def _replace_table_xml(self, full_xml, table_id, new_table_xml):
+        """Replace a specific table's XML block in the full XML."""
+        import re
+        pattern = r'<table\s+[^>]*id\s*=\s*["\']' + re.escape(table_id) + r'["\'][^>]*>.*?</table>'
+        result = re.sub(pattern, new_table_xml, full_xml, count=1, flags=re.DOTALL | re.IGNORECASE)
+        return result
 
     # ── Drag & Drop ───────────────────────────────────────────
 
@@ -902,6 +1055,30 @@ td { font-size: 12px; }
         kind = data[0]
         if kind == 'table':
             table_id = data[1]
+            idx = self.tab_widget.currentIndex()
+            if idx < 0:
+                return
+            tab = self.tab_widget.widget(idx)
+
+            # If in edit mode, update editor with the clicked table's XML
+            if self.btn_edit_mode.isChecked():
+                tab._viewing_table_id = table_id
+                fp = tab._file_path
+                try:
+                    try:
+                        with open(fp, 'r', encoding='utf-8') as f:
+                            raw = f.read()
+                    except UnicodeDecodeError:
+                        with open(fp, 'r', encoding='gbk') as f:
+                            raw = f.read()
+                    tab_content = self._extract_table_xml(raw, table_id)
+                    if tab_content:
+                        tab._editing_table_id = table_id
+                        tab._editor.setPlainText(tab_content)
+                except Exception:
+                    pass
+                return
+
             self._scroll_to_table(table_id)
 
     def _scroll_to_table(self, table_id):

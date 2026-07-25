@@ -1,0 +1,89 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'version.txt'
+      - '.github/workflows/build.yml'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          $version = Get-Content version.txt -Raw
+          $version = $version.Trim()
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "版本号: $version"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install PyQt5 pyinstaller
+
+      - name: Build EXE
+        run: |
+          python -m PyInstaller ^
+            --name "XML数据库设计查看器" ^
+            --windowed ^
+            --onefile ^
+            --clean ^
+            --noconfirm ^
+            --hidden-import PyQt5.QtWidgets ^
+            --hidden-import PyQt5.QtCore ^
+            --hidden-import PyQt5.QtGui ^
+            --hidden-import PyQt5.sip ^
+            main.py
+
+      - name: Rename EXE with version
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          $src = "dist/XML数据库设计查看器.exe"
+          $dst = "dist/XML数据库设计查看器-V${version}.exe"
+          if (Test-Path $src) {
+            Rename-Item $src $dst
+            Write-Host "已重命名: $dst"
+          } else {
+            Write-Error "EXE 文件不存在: $src"
+            exit 1
+          }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: XML数据库设计查看器-V${{ steps.version.outputs.VERSION }}
+          path: dist/*.exe
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: V${{ steps.version.outputs.VERSION }}
+          name: V${{ steps.version.outputs.VERSION }}
+          body: |
+            ## XML数据库设计查看器 V${{ steps.version.outputs.VERSION }}
+
+            ### 更新内容
+            - 请在此处添加更新说明
+
+            ### 下载
+            下载 `XML数据库设计查看器-V${{ steps.version.outputs.VERSION }}.exe` 即可使用
+          files: dist/*.exe
+          make_latest: true
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -4,31 +4,22 @@
 
 ## 功能特性
 
-### 核心功能
-
 | 功能 | 说明 |
 |------|------|
 | **多标签页浏览** | 每个 XML 文件独立一个标签页，支持同时查看多个文件 |
+| **标签页管理** | 右键菜单支持关闭右侧、关闭其他、关闭所有标签页 |
 | **树形导航** | 左侧按模块 → 子模块 → 表 的层级结构展示，点击直接跳转 |
 | **表目录概览** | 右侧 HTML 渲染的表目录，包含表名、中文名、字段数、类型等信息 |
 | **字段详情** | 点击表名查看完整字段列表，包含主键、类型、非空、默认值等 |
 | **搜索过滤** | 支持按表名/字段名实时搜索过滤 |
 | **拖拽导入** | 直接拖拽 XML 文件或文件夹到窗口即可打开 |
-| **编辑模式** | 可切换到编辑模式直接修改 XML 源文件，支持光标同步定位 |
+| **编辑模式** | 可切换到编辑模式直接修改当前选中表的 XML，支持多表切换编辑 |
 | **会话记忆** | 关闭时自动保存打开的文件列表和窗口位置，下次启动自动恢复 |
-
-### 界面设计
-
-- 现代化 UI 风格，蓝色渐变头部栏
-- 行间色交替的表格样式，提高可读性
-- 主键字段红色高亮显示
-- 非必填字段特殊标记
+| **版本显示** | 窗口标题和标题栏显示当前版本号 |
 
 ## 界面预览
 
 ![主界面预览](docs/preview-main.png)
-
-![字段详情预览](docs/preview-detail.png)
 
 ## 环境要求
 
@@ -40,7 +31,7 @@
 
 ### 方式一：直接运行 EXE（推荐）
 
-从 [Releases](https://github.com/hp6120c/xml-viewer/releases) 下载最新版本的 `XML数据库设计查看器.exe`，双击运行即可。
+从 [Releases](https://github.com/hp6120c/xml-viewer/releases) 下载最新版本的 `XML数据库设计查看器-Vx.x.exe`，双击运行即可。
 
 ### 方式二：从源码运行
 
@@ -51,8 +42,7 @@ cd xml-viewer
 
 # 2. 创建虚拟环境
 python -m venv .venv
-.venv\Scripts\activate  # Windows
-# source .venv/bin/activate  # Linux/Mac
+.venv\Scripts\activate
 
 # 3. 安装依赖
 pip install -r requirements.txt
@@ -76,22 +66,30 @@ python main.py
 
 ### 编辑 XML
 
-1. 点击工具栏的 "✏️ 编辑模式" 按钮
-2. 编辑器会自动定位到当前查看的表对应的 XML 位置
-3. 修改完成后点击 "👁️ 阅读模式" 保存并刷新显示
+1. 先点击左侧要编辑的表名
+2. 点击工具栏的 "✏️ 编辑模式" 按钮，编辑器显示该表的 XML 内容
+3. 在编辑模式下点击左侧其他表，编辑器自动切换到对应表的 XML
+4. 修改完成后点击 "👁️ 阅读模式" 保存并刷新显示
 
-### 搜索过滤
+### 标签页管理
 
-在搜索框中输入表名或字段名，左侧树形导航会实时过滤显示匹配项。
+在标签栏上 **右键** 可以：
+
+- **关闭右侧标签页**: 关闭当前标签页右边的所有标签页
+- **关闭其他标签页**: 关闭除当前外的所有标签页
+- **关闭所有标签页**: 关闭全部标签页
 
 ## 项目结构
 
 ```
 xml_viewer/
 ├── main.py              # 程序入口
+├── version.txt          # 版本号
 ├── build.py             # 打包脚本
 ├── requirements.txt     # Python 依赖
 ├── .gitignore           # Git 忽略规则
+├── .github/workflows/
+│   └── build.yml        # CI/CD 自动打包
 ├── ui/
 │   ├── __init__.py
 │   └── main_window.py   # 主窗口界面
@@ -100,51 +98,40 @@ xml_viewer/
     └── xml_parser.py    # XML 解析器
 ```
 
-## 打包成 EXE
+## 版本管理与自动发布
 
-### 方法一：使用打包脚本（推荐）
+项目使用 GitHub Actions 实现自动打包和发布。
+
+### 发布新版本
+
+1. 修改 `version.txt` 中的版本号（如 `1.2`）
+2. 推送到 GitHub：
 
 ```bash
-# 激活虚拟环境
-.venv\Scripts\activate
+git add version.txt
+git commit -m "release: V1.2"
+git push
+```
 
-# 运行打包脚本
+GitHub Actions 会自动：
+- 读取版本号
+- 打包 EXE（文件名包含版本号）
+- 创建 GitHub Release 并上传 EXE
+
+### 本地打包
+
+```bash
 python build.py
 ```
 
-打包完成后，EXE 文件位于 `dist/XML数据库设计查看器.exe`。
-
-### 方法二：手动使用 PyInstaller
-
-```bash
-# 安装 PyInstaller
-pip install pyinstaller
-
-# 打包
-pyinstaller --onefile --windowed \
-  --name "XML数据库设计查看器" \
-  --icon=NONE \
-  --add-data "ui;ui" \
-  --add-data "utils;utils" \
-  --hidden-import PyQt5.sip \
-  main.py
-```
-
-### 打包参数说明
-
-| 参数 | 说明 |
-|------|------|
-| `--onefile` | 打包成单个 EXE 文件 |
-| `--windowed` | 不显示控制台窗口 |
-| `--name` | 指定 EXE 文件名 |
-| `--add-data` | 添加额外的数据文件 |
-| `--hidden-import` | 显式导入隐藏依赖 |
+打包后的 EXE 位于 `dist/` 目录，文件名自动包含版本号。
 
 ## 技术栈
 
 - **GUI 框架**: PyQt5
 - **XML 解析**: xml.etree.ElementTree
 - **打包工具**: PyInstaller
+- **CI/CD**: GitHub Actions
 - **Python 版本**: 3.8+
 
 ## 常见问题
@@ -167,7 +154,3 @@ pyinstaller --hidden-import PyQt5.sip --hidden-import PyQt5.QtWidgets main.py
 ## License
 
 MIT License
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！

@@ -18,10 +18,10 @@ def build_exe():
     if not os.path.exists(build_dir):
         print("  首次构建，复制全部文件...")
         shutil.copytree(script_dir, build_dir,
-                        ignore=shutil.ignore_patterns('.venv', 'build', 'dist', '__pycache__', '*.pyc'))
+                        ignore=shutil.ignore_patterns('.venv', 'build', 'dist', '__pycache__', '*.pyc', '.github'))
     else:
         print("  构建目录已存在，仅更新源码文件...")
-        for name in ['main.py', 'requirements.txt', 'run.bat', 'README.txt']:
+        for name in ['main.py', 'requirements.txt', 'run.bat', 'README.txt', 'version.txt']:
             src = os.path.join(script_dir, name)
             if os.path.exists(src):
                 shutil.copy2(src, os.path.join(build_dir, name))
@@ -75,7 +75,14 @@ def build_exe():
 
     # Step 4: 打包
     print("\n[4/4] 正在打包（可能需要几分钟）...")
-    exe_name = "XMLDatabaseViewer"
+    # Read version
+    version = '1.0'
+    version_file = os.path.join(script_dir, 'version.txt')
+    if os.path.exists(version_file):
+        with open(version_file, 'r', encoding='utf-8') as f:
+            version = f.read().strip() or '1.0'
+
+    exe_name = f"XML数据库设计查看器-V{version}"
     cmd = [
         venv_python, "-m", "PyInstaller",
         os.path.join(build_dir, "main.py"),
@@ -104,11 +111,12 @@ def build_exe():
     if os.path.exists(exe_path):
         target_dir = os.path.join(script_dir, "dist")
         os.makedirs(target_dir, exist_ok=True)
-        target_exe = os.path.join(target_dir, "XML数据库设计查看器.exe")
+        target_exe = os.path.join(target_dir, f"{exe_name}.exe")
         shutil.copy2(exe_path, target_exe)
         size_mb = os.path.getsize(target_exe) / (1024 * 1024)
         print(f"\n{'=' * 50}")
         print(f"  打包成功！")
+        print(f"  版本: V{version}")
         print(f"  文件: {target_exe}")
         print(f"  大小: {size_mb:.2f} MB")
         print(f"{'=' * 50}")
