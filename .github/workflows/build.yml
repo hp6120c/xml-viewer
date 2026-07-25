@@ -42,7 +42,7 @@ jobs:
 
       - name: Build EXE
         shell: pwsh
-        run: python -m PyInstaller --name XMLDatabaseViewer --windowed --onefile --clean --noconfirm --add-data "version.txt;." --hidden-import PyQt5.QtWidgets --hidden-import PyQt5.QtCore --hidden-import PyQt5.QtGui --hidden-import PyQt5.sip main.py
+        run: python -m PyInstaller --name XMLDatabaseViewer --windowed --onefile --icon docs/logo.ico --clean --noconfirm --add-data "version.txt;." --hidden-import PyQt5.QtWidgets --hidden-import PyQt5.QtCore --hidden-import PyQt5.QtGui --hidden-import PyQt5.sip main.py
 
       - name: Rename and package
         shell: pwsh
