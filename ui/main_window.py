@@ -1183,6 +1183,10 @@ td { font-size: 12px; }
         super().showEvent(event)
         if not hasattr(self, '_update_checked'):
             self._update_checked = True
+            # Auto-repair file association if EXE path changed
+            from utils.file_association import check_and_repair
+            check_and_repair()
+            # Check for app updates
             from utils.updater import check_on_startup
             check_on_startup(self, self._version)
 

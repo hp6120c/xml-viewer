@@ -68,7 +68,7 @@ def main():
     # 如果通过命令行传入了 .xml 文件路径，自动打开
     args = [a for a in sys.argv[1:] if a.lower().endswith('.xml') and os.path.isfile(a)]
     if args:
-        window._open_file(args[0])
+        window._load_single_file(args[0])
 
     # 运行应用
     sys.exit(app.exec_())
