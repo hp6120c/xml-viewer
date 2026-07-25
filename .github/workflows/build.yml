@@ -55,6 +55,7 @@ jobs:
           }
           $dst = "dist/XMLDatabaseViewer-V${version}.exe"
           Copy-Item $src $dst
+          Remove-Item $src
           Write-Host "Created: $dst ($(((Get-Item $dst).Length / 1MB).ToString('F2')) MB)"
 
       - name: Upload artifact
