@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+dist/
+build/
+*.spec
+viewer_config.json
+*.exe
