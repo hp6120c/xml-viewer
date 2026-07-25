@@ -39,37 +39,25 @@ jobs:
 
       - name: Build EXE
         shell: pwsh
-        run: |
-          python -m PyInstaller `
-            --name "XMLDatabaseViewer" `
-            --windowed `
-            --onefile `
-            --clean `
-            --noconfirm `
-            --hidden-import PyQt5.QtWidgets `
-            --hidden-import PyQt5.QtCore `
-            --hidden-import PyQt5.QtGui `
-            --hidden-import PyQt5.sip `
-            main.py
+        run: python -m PyInstaller --name XMLDatabaseViewer --windowed --onefile --clean --noconfirm --hidden-import PyQt5.QtWidgets --hidden-import PyQt5.QtCore --hidden-import PyQt5.QtGui --hidden-import PyQt5.sip main.py
 
-      - name: Rename EXE with version
+      - name: Rename and package
         shell: pwsh
         run: |
           $version = "${{ steps.version.outputs.VERSION }}"
           $src = "dist/XMLDatabaseViewer.exe"
-          $dst = "dist/XML数据库设计查看器-V${version}.exe"
-          if (Test-Path $src) {
-            Rename-Item $src $dst
-            Write-Host "已重命名: $dst"
-          } else {
-            Write-Error "EXE 文件不存在: $src"
+          if (-not (Test-Path $src)) {
+            Write-Error "EXE not found: $src"
             exit 1
           }
+          $dst = "dist/XMLDatabaseViewer-V${version}.exe"
+          Copy-Item $src $dst
+          Write-Host "Created: $dst ($(((Get-Item $dst).Length / 1MB).ToString('F2')) MB)"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: XML数据库设计查看器-V${{ steps.version.outputs.VERSION }}
+          name: XMLDatabaseViewer-V${{ steps.version.outputs.VERSION }}
           path: dist/*.exe
 
       - name: Create Release
@@ -77,11 +65,7 @@ jobs:
         with:
           tag_name: V${{ steps.version.outputs.VERSION }}
           name: V${{ steps.version.outputs.VERSION }}
-          body: |
-            ## XML数据库设计查看器 V${{ steps.version.outputs.VERSION }}
-
-            ### 下载
-            下载 `XML数据库设计查看器-V${{ steps.version.outputs.VERSION }}.exe` 即可使用
+          body: "XMLDatabaseViewer V${{ steps.version.outputs.VERSION }}"
           files: dist/*.exe
           make_latest: true
           draft: false
