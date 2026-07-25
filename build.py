@@ -89,7 +89,7 @@ def build_exe():
         f"--name={exe_name}",
         "--windowed",
         "--onefile",
-        "--icon=NONE",
+        f"--icon={os.path.join(script_dir, 'docs', 'logo.ico')}",
         f"--distpath={dist_dir}",
         f"--workpath={build_subdir}",
         "--clean",
