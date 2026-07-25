@@ -26,9 +26,9 @@
 
 ## 界面预览
 
-![主界面预览](https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=screenshot%20of%20a%20modern%20desktop%20application%20with%20blue%20gradient%20header%2C%20left%20sidebar%20with%20tree%20navigation%20showing%20database%20tables%2C%20right%20panel%20showing%20database%20schema%20overview%20table%20with%20alternating%20row%20colors%2C%20clean%20professional%20UI%20design%2C%20PyQt5%20application&image_size=landscape_16_9)
+![主界面预览](docs/preview-main.png)
 
-![字段详情预览](https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=screenshot%20of%20database%20schema%20detail%20view%20showing%20column%20definitions%20table%20with%20fields%20like%20column%20name%2C%20type%2C%20primary%20key%2C%20required%2C%20default%20value%2C%20alternating%20green%20and%20white%20row%20background%20colors%2C%20professional%20database%20documentation%20style&image_size=landscape_16_9)
+![字段详情预览](docs/preview-detail.png)
 
 ## 环境要求
 
