@@ -1,6 +1,13 @@
-# XML 数据库设计查看器
+<p align="center">
+  <img src="docs/logo.svg" width="128" alt="Logo">
+</p>
 
-一个基于 PyQt5 开发的桌面应用程序，用于方便地浏览和编辑 SCL Schema 格式的 XML 数据库设计文件。支持多标签页、拖拽导入、编辑模式、搜索过滤和会话记忆等功能。
+<h1 align="center">XML 数据库设计查看器</h1>
+
+<p align="center">
+  一个基于 PyQt5 开发的桌面应用程序，用于方便地浏览和编辑 SCL Schema 格式的 XML 数据库设计文件。<br>
+  支持多标签页、拖拽导入、编辑模式、搜索过滤和会话记忆等功能。
+</p>
 
 ## 功能特性
 
@@ -31,7 +38,7 @@
 
 ### 方式一：直接运行 EXE（推荐）
 
-从 [Releases](https://github.com/hp6120c/xml-viewer/releases) 下载最新版本的 `XML数据库设计查看器-Vx.x.exe`，双击运行即可。
+从 [Releases](https://github.com/hp6120c/xml-viewer/releases) 下载最新版本的 `XMLDatabaseViewer-Vx.x.exe`，双击运行即可。
 
 ### 方式二：从源码运行
 
@@ -90,6 +97,9 @@ xml_viewer/
 ├── .gitignore           # Git 忽略规则
 ├── .github/workflows/
 │   └── build.yml        # CI/CD 自动打包
+├── docs/
+│   ├── logo.svg         # 应用 Logo
+│   └── preview-main.png # 界面预览
 ├── ui/
 │   ├── __init__.py
 │   └── main_window.py   # 主窗口界面

@@ -28,12 +28,12 @@ def _row_bg(idx):
 # ── Config persistence ────────────────────────────────────────
 
 def _config_path():
-    """Return path to the config JSON file (next to the exe or script)."""
+    """Return path to the config JSON file in %APPDATA% (or script dir for dev)."""
     if getattr(sys, 'frozen', False):
-        base = os.path.dirname(sys.executable)
+        base = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'XMLDatabaseViewer')
     else:
-        base = os.path.dirname(os.path.abspath(__file__))
-        base = os.path.dirname(base)  # project root
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    os.makedirs(base, exist_ok=True)
     return os.path.join(base, 'viewer_config.json')
 
 def _load_config():
