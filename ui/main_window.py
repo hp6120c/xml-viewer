@@ -178,6 +178,11 @@ class MainWindow(QMainWindow):
         self.btn_update.clicked.connect(self._check_update)
         h.addWidget(self.btn_update)
 
+        self.btn_register = self._make_btn('🔗 设为默认')
+        self.btn_register.setToolTip('注册为 XML 文件的默认打开方式')
+        self.btn_register.clicked.connect(self._register_association)
+        h.addWidget(self.btn_register)
+
         self.file_info_label = QLabel('')
         self.file_info_label.setObjectName('fileInfoLabel')
         h.addWidget(self.file_info_label)
@@ -1165,6 +1170,10 @@ td { font-size: 12px; }
             item.setHidden(not any_visible)
             item.setExpanded(any_visible)
             return any_visible
+
+    def _register_association(self):
+        from utils.file_association import register_file_association
+        register_file_association(self)
 
     def _check_update(self):
         from utils.updater import check_and_update
