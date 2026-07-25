@@ -174,6 +174,10 @@ class MainWindow(QMainWindow):
 
         h.addStretch()
 
+        self.btn_update = self._make_btn('🔄 检查更新')
+        self.btn_update.clicked.connect(self._check_update)
+        h.addWidget(self.btn_update)
+
         self.file_info_label = QLabel('')
         self.file_info_label.setObjectName('fileInfoLabel')
         h.addWidget(self.file_info_label)
@@ -1161,6 +1165,17 @@ td { font-size: 12px; }
             item.setHidden(not any_visible)
             item.setExpanded(any_visible)
             return any_visible
+
+    def _check_update(self):
+        from utils.updater import check_and_update
+        check_and_update(self, self._version)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not hasattr(self, '_update_checked'):
+            self._update_checked = True
+            from utils.updater import check_on_startup
+            check_on_startup(self, self._version)
 
     def closeEvent(self, event):
         self._save_session()
