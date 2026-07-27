@@ -1,4 +1,4 @@
-.venv/
+﻿.venv/
 __pycache__/
 *.pyc
 dist/
@@ -6,3 +6,9 @@ build/
 *.spec
 viewer_config.json
 *.exe
+*.backup
+*.backup2
+fix*.py
+run.bat
+screenshot.py
+web/
