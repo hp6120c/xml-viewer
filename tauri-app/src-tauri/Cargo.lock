@@ -5275,7 +5275,7 @@ dependencies = [
 
 [[package]]
 name = "xml-database-viewer"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "encoding_rs",
  "roxmltree",

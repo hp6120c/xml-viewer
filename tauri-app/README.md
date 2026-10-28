@@ -352,7 +352,7 @@ env:
 
 1. 确认本机 updater 私钥与 `tauri.conf.json` 中的公钥来自同一对密钥；
 2. 把私钥完整内容保存到 `TAURI_SIGNING_PRIVATE_KEY`，有密码时再保存 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`；
-3. 确认下面四个文件的版本号一致。首次发布当前代码时为 `2.0.0`，后续发布时四个文件必须同步修改：
+3. 确认下面四个文件的版本号一致。首次发布当前代码时为 `2.0.1`，后续发布时四个文件必须同步修改：
    - `tauri-app/package.json`
    - `tauri-app/package-lock.json`
    - `tauri-app/src-tauri/Cargo.toml`
@@ -362,8 +362,8 @@ env:
 6. 创建并推送版本标签：
 
 ```powershell
-git tag v2.0.0
-git push origin v2.0.0
+git tag v2.0.1
+git push origin v2.0.1
 ```
 
 也可以在 GitHub Actions 页面手动运行 `Build and Release Tauri App`，在 `release_tag` 中填写同一个标签。工作流会失败而不是发布版本不一致的安装包。之后的版本沿用同样流程，只需把标签和四个版本文件一起更新。
@@ -392,6 +392,7 @@ https://github.com/hp6120c/xml-viewer/releases/latest/download/latest.json
 - 当前构建使用 Tauri updater 的 minisign 签名，不等于 Windows Authenticode 代码签名；未配置代码签名证书时，首次下载仍可能出现 SmartScreen 提示；
 - 自动更新依赖同一把 updater 私钥持续签名；私钥丢失后无法为旧版本用户发布可验证的更新；
 - GitHub Release 的公开 `latest.json` 可能受 CDN 缓存影响，刚发布后短时间内的更新检查不保证立即看到新版本。
+
 
 
 

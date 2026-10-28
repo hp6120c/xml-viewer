@@ -1,6 +1,6 @@
 # XML 数据库设计查看器
 
-当前主版本为 **V2.0.0**，架构为 **Tauri 2 + React + TypeScript + Rust**，运行在 Windows WebView2/Chromium 上。新的 UI 使用标准 HTML/CSS 自适应布局，右侧表目录和字段表会铺满内容区，并支持窗口缩放。
+当前主版本为 **V2.0.1**，架构为 **Tauri 2 + React + TypeScript + Rust**，运行在 Windows WebView2/Chromium 上。新的 UI 使用标准 HTML/CSS 自适应布局，右侧表目录和字段表会铺满内容区，并支持窗口缩放。
 
 ## 目录
 
@@ -41,3 +41,4 @@ npm run test:layout
 ```
 
 真实 SCL 目录测试可按 `tauri-app/README.md` 中的说明通过 `XML_VIEWER_TEST_DIR` 运行。
+
