@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#38bdf8;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#0ea5e9;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0369a1;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="dbBody" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0c4a6e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#082f49;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="dbTop" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#f0f9ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#bae6fd;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="shine" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.25" />
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#082f49" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Rounded background with subtle shine -->
+  <rect x="16" y="16" width="480" height="480" rx="108" ry="108" fill="url(#bg)"/>
+  <rect x="16" y="16" width="480" height="240" rx="108" ry="108" fill="url(#shine)"/>
+
+  <!-- "XML" text with shadow -->
+  <text x="256" y="228" text-anchor="middle" font-family="'Segoe UI', Arial, Helvetica, sans-serif" font-weight="800" font-size="152" fill="white" letter-spacing="16" filter="url(#shadow)">XML</text>
+
+  <!-- Database cylinder -->
+  <g transform="translate(256, 340)" filter="url(#shadow)">
+    <!-- Bottom ellipse -->
+    <ellipse cx="0" cy="28" rx="78" ry="20" fill="#082f49"/>
+    <!-- Body -->
+    <rect x="-78" y="-28" width="156" height="56" fill="url(#dbBody)"/>
+    <!-- Top ellipse -->
+    <ellipse cx="0" cy="-28" rx="78" ry="20" fill="url(#dbTop)"/>
+    <!-- Highlight line on top -->
+    <ellipse cx="0" cy="-28" rx="60" ry="12" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.3"/>
+    <!-- Middle band -->
+    <ellipse cx="0" cy="0" rx="78" ry="20" fill="none" stroke="#38bdf8" stroke-width="2" opacity="0.45"/>
+    <!-- Bottom band -->
+    <ellipse cx="0" cy="28" rx="78" ry="20" fill="none" stroke="#7dd3fc" stroke-width="1.5" opacity="0.3"/>
+  </g>
+
+  <!-- Small decorative elements -->
+  <circle cx="130" cy="400" r="4" fill="#e0f2fe" opacity="0.35"/>
+  <circle cx="382" cy="400" r="4" fill="#e0f2fe" opacity="0.35"/>
+  <circle cx="100" cy="120" r="3" fill="#ffffff" opacity="0.2"/>
+  <circle cx="412" cy="140" r="3" fill="#ffffff" opacity="0.2"/>
+</svg>

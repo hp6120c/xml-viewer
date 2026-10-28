@@ -1,0 +1,70 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "XML数据库设计查看器",
+  "version": "2.0.0",
+  "identifier": "com.hp6120c.xmlviewer",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "数据库设计查看器",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 640,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false,
+        "dragDropEnabled": true,
+        "theme": "Light"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": [
+          "xml"
+        ],
+        "name": "XML Database Design",
+        "description": "SCL Schema XML database design file",
+        "role": "Viewer",
+        "mimeType": "application/xml"
+      }
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false
+      }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDEyMUQ3NzAyRjQ1MUQ0QjkKUldTNTFGSDBBbmNkRXRZTXRVdnBEd0NkaWJXNUF6ckpiNk5NWHNOWVN5Z0Mya0lLZU5CTk1aUE0K",
+      "endpoints": [
+        "https://github.com/hp6120c/xml-viewer/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

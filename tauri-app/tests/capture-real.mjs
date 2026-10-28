@@ -1,0 +1,14 @@
+import { chromium } from "playwright";
+import path from "node:path";
+const out = path.resolve(process.cwd(), "..", "..", "..", "outputs");
+const browser = await chromium.connectOverCDP("http://127.0.0.1:9222");
+const page = browser.contexts().flatMap(c => c.pages()).find(p => p.url().includes("tauri.localhost"));
+if (!page) throw new Error("Tauri page not found");
+await page.reload({ waitUntil: "networkidle" });
+await page.locator('[data-testid="overview-page"]').waitFor();
+await page.screenshot({ path: path.join(out, "tauri-real-lom-overview.png") });
+await page.getByRole("button", { name: "LOM_VEND" }).first().click();
+await page.locator('[data-testid="table-detail"]').waitFor();
+await page.screenshot({ path: path.join(out, "tauri-real-lom-detail.png") });
+console.log(JSON.stringify({ status: "ok", files: ["tauri-real-lom-overview.png", "tauri-real-lom-detail.png"] }, null, 2));
+await browser.close();

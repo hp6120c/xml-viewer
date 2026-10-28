@@ -1,0 +1,227 @@
+name: Build and Release Tauri App
+
+on:
+  push:
+    tags:
+      - "v*"
+      - "V*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag, for example v2.0.1 (must match all project version fields)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tauri-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: tauri-app
+
+jobs:
+  release:
+    name: Build signed NSIS release
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tauri-app/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tauri-app/src-tauri -> tauri-app/src-tauri/target
+
+      - name: Install frontend dependencies
+        shell: pwsh
+        run: npm ci --no-audit --no-fund
+
+      - name: Validate updater signing secret
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
+            throw "GitHub secret TAURI_SIGNING_PRIVATE_KEY is not configured"
+          }
+          Write-Host "Updater signing secret is configured"
+
+      - name: Resolve and validate version
+        id: meta
+        shell: pwsh
+        env:
+          RELEASE_TAG_INPUT: ${{ inputs.release_tag }}
+        run: |
+          $eventName = $env:GITHUB_EVENT_NAME
+          if ($eventName -eq "workflow_dispatch") {
+            $tag = $env:RELEASE_TAG_INPUT.Trim()
+          } else {
+            $tag = $env:GITHUB_REF_NAME
+          }
+
+          if ($tag -notmatch '^[vV]\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') {
+            throw "Release tag must be a semantic version such as v2.0.1; received '$tag'"
+          }
+
+          $package = Get-Content package.json -Raw | ConvertFrom-Json
+          $packageLock = Get-Content package-lock.json -Raw | ConvertFrom-Json -AsHashtable
+          $tauri = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $cargoText = Get-Content src-tauri/Cargo.toml -Raw
+          $cargoMatch = [regex]::Match(
+            $cargoText,
+            '(?ms)^\[package\]\s*(?:\r?\n)(?:(?!^\[).)*?^version\s*=\s*"([^"]+)"'
+          )
+          if (-not $cargoMatch.Success) {
+            throw "Unable to read the package version from src-tauri/Cargo.toml"
+          }
+
+          $versions = @(
+            $package.version,
+            $packageLock['packages']['']['version'],
+            $tauri.version,
+            $cargoMatch.Groups[1].Value.Trim()
+          )
+          $uniqueVersions = @($versions | Select-Object -Unique)
+          if ($uniqueVersions.Count -ne 1) {
+            throw "Project version mismatch: package=$($versions[0]), lock=$($versions[1]), tauri=$($versions[2]), cargo=$($versions[3])"
+          }
+
+          $version = $uniqueVersions[0]
+          $tagVersion = $tag -replace '^[vV]', ''
+          if ($tagVersion -ne $version) {
+            throw "Release tag '$tag' does not match project version '$version'"
+          }
+
+          if ([string]::IsNullOrWhiteSpace($tauri.plugins.updater.pubkey)) {
+            throw "The updater public key is missing from tauri.conf.json"
+          }
+          if (-not $tauri.bundle.createUpdaterArtifacts) {
+            throw "bundle.createUpdaterArtifacts must be enabled for signed updater releases"
+          }
+          $expectedEndpoint = "https://github.com/hp6120c/xml-viewer/releases/latest/download/latest.json"
+          if (@($tauri.plugins.updater.endpoints) -notcontains $expectedEndpoint) {
+            throw "The updater endpoint in tauri.conf.json does not match $expectedEndpoint"
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          Write-Host "Project version: $version"
+          Write-Host "Release tag: $tag"
+
+      - name: Test frontend and Rust backend
+        shell: pwsh
+        run: npm run check
+
+      - name: Build updater artifacts and publish release
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: tauri-app
+          tagName: ${{ steps.meta.outputs.tag }}
+          releaseName: XML 数据库设计查看器 ${{ steps.meta.outputs.tag }}
+          releaseBody: |
+            Windows NSIS 安装包。自动更新清单为 `latest.json`，更新包使用 Tauri updater 签名。
+          releaseCommitish: ${{ github.sha }}
+          releaseDraft: false
+          prerelease: false
+          generateReleaseNotes: true
+          args: --bundles nsis
+          retryAttempts: 2
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+
+      - name: Verify release assets and updater manifest
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          $repo = $env:GITHUB_REPOSITORY
+          $releaseJson = gh api "repos/$repo/releases/tags/$($env:RELEASE_TAG)"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Unable to read release $($env:RELEASE_TAG)"
+          }
+
+          $release = ($releaseJson | Out-String) | ConvertFrom-Json
+          $assetNames = @($release.assets | ForEach-Object { $_.name })
+          $setupAsset = $assetNames | Where-Object { $_ -match '\.exe$' } | Select-Object -First 1
+          if (-not $setupAsset) {
+            throw "The release does not contain an NSIS .exe asset"
+          }
+          if ($assetNames -notcontains "$setupAsset.sig") {
+            throw "The release does not contain $setupAsset.sig"
+          }
+          if ($assetNames -notcontains "latest.json") {
+            throw "The release does not contain latest.json"
+          }
+
+          $latestTag = $null
+          for ($attempt = 1; $attempt -le 12; $attempt += 1) {
+            $latestReleaseJson = gh api "repos/$repo/releases/latest"
+            if ($LASTEXITCODE -eq 0) {
+              $latestRelease = ($latestReleaseJson | Out-String) | ConvertFrom-Json
+              $latestTag = $latestRelease.tag_name
+              if ($latestTag -eq $env:RELEASE_TAG) {
+                break
+              }
+            }
+            Start-Sleep -Seconds 5
+          }
+          if ($latestTag -ne $env:RELEASE_TAG) {
+            throw "GitHub latest release is '$latestTag', expected '$($env:RELEASE_TAG)'"
+          }
+
+          $verifyDir = Join-Path $env:RUNNER_TEMP "tauri-updater-verify"
+          New-Item -ItemType Directory -Force -Path $verifyDir | Out-Null
+          gh release download $env:RELEASE_TAG --repo $repo --pattern latest.json --dir $verifyDir --clobber
+          if ($LASTEXITCODE -ne 0) {
+            throw "Unable to download latest.json from the release"
+          }
+
+          $latest = Get-Content (Join-Path $verifyDir "latest.json") -Raw | ConvertFrom-Json
+          $platform = $latest.platforms.'windows-x86_64'
+          if (-not $platform) {
+            throw "latest.json does not contain a windows-x86_64 platform entry"
+          }
+          if ([string]::IsNullOrWhiteSpace($platform.url)) {
+            throw "latest.json has no Windows update URL"
+          }
+          if ([string]::IsNullOrWhiteSpace($platform.signature)) {
+            throw "latest.json has no Windows updater signature"
+          }
+
+          $uri = [Uri]$platform.url
+          $expectedPrefix = "https://github.com/$repo/releases/download/$($env:RELEASE_TAG)/"
+          if (-not $uri.AbsoluteUri.StartsWith($expectedPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "latest.json URL does not point to the release tag: $($uri.AbsoluteUri)"
+          }
+          $urlAssetName = [Uri]::UnescapeDataString([IO.Path]::GetFileName($uri.AbsolutePath))
+          if ($assetNames -notcontains $urlAssetName) {
+            throw "latest.json points to a missing release asset: $urlAssetName"
+          }
+
+          Write-Host "Release assets verified: $setupAsset, $setupAsset.sig, latest.json"
+          Write-Host "Updater URL verified: $($uri.AbsoluteUri)"

@@ -1,0 +1,10 @@
+import { chromium } from "playwright";
+const browser = await chromium.connectOverCDP("http://127.0.0.1:9222");
+const page = browser.contexts().flatMap(c => c.pages()).find(p => p.url().includes("tauri.localhost"));
+if (!page) throw new Error("Tauri page not found");
+await page.locator('[role="tab"]').first().waitFor();
+const tabs = await page.locator('[role="tab"]').allInnerTexts();
+const genericVisible = await page.locator('[data-testid="generic-xml-view"]').isVisible().catch(() => false);
+if (tabs.length < 2 || !genericVisible) throw new Error(`Single-instance handoff failed: tabs=${JSON.stringify(tabs)}, generic=${genericVisible}`);
+console.log(JSON.stringify({ status: "ok", tabs, genericVisible }, null, 2));
+await browser.close();
