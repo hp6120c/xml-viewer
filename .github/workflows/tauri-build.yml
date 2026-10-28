@@ -214,14 +214,30 @@ jobs:
           }
 
           $uri = [Uri]$platform.url
-          $expectedPrefix = "https://github.com/$repo/releases/download/$($env:RELEASE_TAG)/"
-          if (-not $uri.AbsoluteUri.StartsWith($expectedPrefix, [StringComparison]::OrdinalIgnoreCase)) {
-            throw "latest.json URL does not point to the release tag: $($uri.AbsoluteUri)"
+          $urlAssetName = $null
+
+          if ($uri.Host -eq "api.github.com" -and $uri.AbsolutePath -match '/releases/assets/(\d+)$') {
+            $urlAssetId = [long]$Matches[1]
+            $asset = $release.assets | Where-Object { [long]$_.id -eq $urlAssetId } | Select-Object -First 1
+            if (-not $asset) {
+              throw "latest.json points to a missing GitHub API asset ID: $urlAssetId"
+            }
+            $urlAssetName = $asset.name
+          } else {
+            $expectedPrefix = "https://github.com/$repo/releases/download/$($env:RELEASE_TAG)/"
+            if (-not $uri.AbsoluteUri.StartsWith($expectedPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+              throw "latest.json URL does not point to the release tag: $($uri.AbsoluteUri)"
+            }
+            $urlAssetName = [Uri]::UnescapeDataString([IO.Path]::GetFileName($uri.AbsolutePath))
+            if ($assetNames -notcontains $urlAssetName) {
+              throw "latest.json points to a missing release asset: $urlAssetName"
+            }
           }
-          $urlAssetName = [Uri]::UnescapeDataString([IO.Path]::GetFileName($uri.AbsolutePath))
-          if ($assetNames -notcontains $urlAssetName) {
-            throw "latest.json points to a missing release asset: $urlAssetName"
+
+          if ($urlAssetName -ne $setupAsset) {
+            throw "latest.json points to '$urlAssetName', expected '$setupAsset'"
           }
 
           Write-Host "Release assets verified: $setupAsset, $setupAsset.sig, latest.json"
           Write-Host "Updater URL verified: $($uri.AbsoluteUri)"
+
