@@ -83,6 +83,7 @@ async function openExternalLink(url: string): Promise<void> {
 function sanitizeMarkdownHtml(html: string): string {
   const sanitized = DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true },
+    ADD_ATTR: ["data-source-line", "data-source-line-end"],
     FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form", "meta", "link", "base"],
     FORBID_ATTR: ["srcset"],
   });
@@ -169,6 +170,7 @@ function localStyleHtml(text: string, style: MarkdownLocalStyle): string {
   if (style.underline !== undefined) {
     declarations.push(`text-decoration: ${style.underline ? "underline" : "none"}`);
   }
+  if (declarations.length === 0) return escapeHtml(text);
   const styleAttribute = declarations.length > 0
     ? ` style="${escapeHtml(declarations.join("; "))}"`
     : "";
@@ -190,6 +192,9 @@ function currentSelectionStyle(range: Range): MarkdownLocalStyle {
   const style = getComputedStyle(element);
   const weight = Number.parseInt(style.fontWeight, 10);
   const family = style.fontFamily.toLocaleLowerCase();
+  const transparentBackground =
+    style.backgroundColor === "transparent"
+    || style.backgroundColor === "rgba(0, 0, 0, 0)";
   return {
     fontSize: style.fontSize,
     fontFamily: family.includes("cascadia") || family.includes("consolas") || family.includes("mono")
@@ -198,13 +203,110 @@ function currentSelectionStyle(range: Range): MarkdownLocalStyle {
         ? "serif"
         : "system",
     color: toHexColor(style.color, "#20384e"),
-    backgroundColor: toHexColor(style.backgroundColor, "#fff0a8"),
+    backgroundColor: transparentBackground
+      ? undefined
+      : toHexColor(style.backgroundColor, "#fff0a8"),
     bold: !Number.isNaN(weight) ? weight >= 600 : style.fontWeight === "bold",
     italic: style.fontStyle === "italic" || style.fontStyle === "oblique",
     underline:
       style.textDecorationLine.includes("underline")
       || style.textDecoration.includes("underline"),
+    preserve: Boolean(element.closest("span[style], strong, b, em, i, u, h1, h2, h3, h4, h5, h6")),
   };
+}
+
+function lineStartOffsets(source: string): number[] {
+  const offsets = [0];
+  for (let index = 0; index < source.length; index += 1) {
+    if (source[index] === "\n") offsets.push(index + 1);
+  }
+  return offsets;
+}
+
+function projectInlineText(raw: string): { plain: string; positions: number[] } {
+  let plain = "";
+  const positions: number[] = [];
+  let index = 0;
+  while (index < raw.length) {
+    if (raw[index] === "<") {
+      const end = raw.indexOf(">", index);
+      if (end >= 0) {
+        index = end + 1;
+        continue;
+      }
+    }
+    if (
+      raw.startsWith("**", index)
+      || raw.startsWith("__", index)
+      || raw.startsWith("~~", index)
+    ) {
+      index += 2;
+      continue;
+    }
+    if (raw[index] === "*" || raw[index] === "_" || raw[index] === "`") {
+      index += 1;
+      continue;
+    }
+    plain += raw[index];
+    positions.push(index);
+    index += 1;
+  }
+  return { plain, positions };
+}
+
+function findSelectionSourceRange(
+  source: string,
+  block: HTMLElement,
+  text: string,
+): { start: number; end: number } | null {
+  const startLine = Number(block.dataset.sourceLine) - 1;
+  const endLine = Number(block.dataset.sourceLineEnd) - 1;
+  if (!Number.isFinite(startLine) || startLine < 0) return null;
+
+  const offsets = lineStartOffsets(source);
+  const blockStart = offsets[startLine] ?? 0;
+  const blockEnd = Number.isFinite(endLine)
+    ? offsets[endLine] ?? source.length
+    : source.length;
+  const raw = source.slice(blockStart, blockEnd);
+  const projection = projectInlineText(raw);
+  const first = projection.plain.indexOf(text);
+  if (first < 0 || projection.plain.indexOf(text, first + text.length) >= 0) {
+    return null;
+  }
+  const firstRaw = projection.positions[first];
+  const lastRaw = projection.positions[first + text.length - 1];
+  if (firstRaw === undefined || lastRaw === undefined) return null;
+  return {
+    start: blockStart + firstRaw,
+    end: blockStart + lastRaw + 1,
+  };
+}
+
+function expandInlineStyleTags(source: string, start: number, end: number): { start: number; end: number } {
+  const tagPattern = /<(\/?)(span|strong|b|em|i|u)\b[^>]*>/gi;
+  const stack: Array<{ tag: string; start: number }> = [];
+  const intervals: Array<{ start: number; end: number }> = [];
+  let match: RegExpExecArray | null;
+  while ((match = tagPattern.exec(source))) {
+    const tag = match[2].toLowerCase();
+    if (match[1] === "/") {
+      const openIndex = stack.map((item) => item.tag).lastIndexOf(tag);
+      if (openIndex >= 0) {
+        const [open] = stack.splice(openIndex, 1);
+        intervals.push({ start: open.start, end: match.index + match[0].length });
+      }
+    } else {
+      stack.push({ tag, start: match.index });
+    }
+  }
+  for (const interval of intervals) {
+    if (interval.start < end && interval.end > start) {
+      start = Math.min(start, interval.start);
+      end = Math.max(end, interval.end);
+    }
+  }
+  return { start, end };
 }
 
 export function MarkdownView({
@@ -221,6 +323,7 @@ export function MarkdownView({
     rect: DOMRect;
     text: string;
     style: MarkdownLocalStyle;
+    block: HTMLElement | null;
   } | null>(null);
   const rendered = useMemo(() => parseMarkdown(source), [source]);
   const sanitizedHtml = useMemo(() => sanitizeMarkdownHtml(rendered.html), [rendered.html]);
@@ -308,25 +411,34 @@ export function MarkdownView({
       setSelection(null);
       return;
     }
+    const selectionNode = range.commonAncestorContainer;
+    const selectionElement = selectionNode instanceof Element
+      ? selectionNode
+      : selectionNode.parentElement;
+    const block = selectionElement?.closest<HTMLElement>("[data-source-line]") ?? null;
     selectionRef.current = range.cloneRange();
     setSelection({
       rect: range.getBoundingClientRect(),
       text,
       style: currentSelectionStyle(range),
+      block,
     });
   };
 
   const applyLocalStyle = (style: MarkdownLocalStyle) => {
     const selected = selectionRef.current;
     const text = selected?.toString().trim() ?? "";
-    if (!text || !onLocalStyleChange) return;
-    const first = source.indexOf(text);
-    if (first < 0 || source.indexOf(text, first + text.length) >= 0) {
-      onLocalStyleError?.("当前选区不是唯一的纯文本片段，请只选择同一段落内的一段文字");
+    if (!text || !onLocalStyleChange || !selection) return;
+    const sourceRange = selection.block
+      ? findSelectionSourceRange(source, selection.block, text)
+      : null;
+    if (!sourceRange) {
+      onLocalStyleError?.("无法定位当前选区，请只选择同一段落内的一段文字");
       return;
     }
-    let start = first;
-    let end = first + text.length;
+    let start = sourceRange.start;
+    let end = sourceRange.end;
+    ({ start, end } = expandInlineStyleTags(source, start, end));
     const unwrap = (opening: string, closing: string) => {
       if (
         source.slice(0, start).endsWith(opening)

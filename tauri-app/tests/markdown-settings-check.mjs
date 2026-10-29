@@ -36,6 +36,10 @@ try {
   await page.locator(".markdown-theme-card.theme-dark").click();
   await page.locator(".markdown-setting-row select").nth(1).selectOption("full");
   await page.locator(".markdown-setting-range input[type='range']").first().fill("19");
+  const navSettings = page.locator(".markdown-settings-section").filter({ hasText: "左侧导航" });
+  await navSettings.locator("select").first().selectOption("serif");
+  await navSettings.locator("select").nth(1).selectOption("700");
+  await navSettings.locator("input[type='range']").fill("16");
 
   const result = await page.locator('[data-testid="markdown-view"]').evaluate((element) => {
     const style = getComputedStyle(element);
@@ -52,10 +56,21 @@ try {
   assert.equal(result.text, "#dce8f2");
   assert.equal(result.fontSize, "19px");
   assert.equal(result.width, "none");
+  const navStyle = await page.locator(".markdown-toc-item").first().evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      fontSize: style.fontSize,
+      fontWeight: style.fontWeight,
+      fontFamily: style.fontFamily,
+    };
+  });
+  assert.equal(navStyle.fontSize, "16px");
+  assert.equal(navStyle.fontWeight, "700");
+  assert.match(navStyle.fontFamily, /Georgia|Songti|Noto Serif/);
 
   const screenshot = path.join(outputDir, "markdown-style-settings-1440x900.png");
   await page.screenshot({ path: screenshot, fullPage: true });
-  console.log(JSON.stringify({ ok: true, result, screenshot }, null, 2));
+  console.log(JSON.stringify({ ok: true, result, navStyle, screenshot }, null, 2));
 } finally {
   await browser.close();
 }

@@ -298,6 +298,17 @@ markdown.use(footnote);
 markdown.use(taskLists, { enabled: false });
 markdown.use(emoji);
 
+// Keep block source ranges in the rendered DOM so preview selections can be
+// translated back to the Markdown source without relying on text uniqueness.
+markdown.core.ruler.push("source_line_attrs", (state) => {
+  for (const token of state.tokens) {
+    if (token.nesting === 1 && token.map) {
+      token.attrSet("data-source-line", String(token.map[0] + 1));
+      token.attrSet("data-source-line-end", String(token.map[1] + 1));
+    }
+  }
+});
+
 markdown.renderer.rules.fence = (tokens, index) => {
   const token = tokens[index];
   const language = (token.info.trim().split(/\s+/)[0] ?? "").replace(/[^\w-]/g, "");

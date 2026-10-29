@@ -21,6 +21,7 @@
 - Markdown 相对图片安全加载，仅允许读取当前 Markdown 文件目录内的资源
 - Markdown 预览中选中文字后可局部修改字号、字体、颜色、高亮、粗体、斜体和下划线
 - 新建 Markdown / XML 文件、全屏标签阅读、Markdown 基础阅读样式
+- Markdown 基础样式可单独调整左侧大纲的字体、字号和字重
 - 自适应窗口布局、缩放、标签页右键菜单
 - Windows `.xml` / `.md` / `.markdown` 文件关联、命令行/双击打开、单实例转交
 - GitHub 项目链接跳转

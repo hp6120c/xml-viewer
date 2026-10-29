@@ -10,6 +10,7 @@ export interface MarkdownLocalStyle {
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
+  preserve?: boolean;
 }
 
 interface MarkdownSelectionToolbarProps {
@@ -29,16 +30,17 @@ export function MarkdownSelectionToolbar({
   const [fontFamily, setFontFamily] = useState(initialStyle.fontFamily ?? "");
   const [color, setColor] = useState(initialStyle.color ?? "#20384e");
   const [backgroundColor, setBackgroundColor] = useState(initialStyle.backgroundColor ?? "#fff0a8");
-  const [fontSizeTouched, setFontSizeTouched] = useState(false);
-  const [fontFamilyTouched, setFontFamilyTouched] = useState(false);
-  const [colorTouched, setColorTouched] = useState(false);
-  const [backgroundTouched, setBackgroundTouched] = useState(false);
+  const preserve = Boolean(initialStyle.preserve);
+  const [fontSizeTouched, setFontSizeTouched] = useState(preserve);
+  const [fontFamilyTouched, setFontFamilyTouched] = useState(preserve);
+  const [colorTouched, setColorTouched] = useState(preserve);
+  const [backgroundTouched, setBackgroundTouched] = useState(Boolean(initialStyle.backgroundColor));
   const [bold, setBold] = useState(Boolean(initialStyle.bold));
   const [italic, setItalic] = useState(Boolean(initialStyle.italic));
   const [underline, setUnderline] = useState(Boolean(initialStyle.underline));
-  const [boldTouched, setBoldTouched] = useState(false);
-  const [italicTouched, setItalicTouched] = useState(false);
-  const [underlineTouched, setUnderlineTouched] = useState(false);
+  const [boldTouched, setBoldTouched] = useState(preserve);
+  const [italicTouched, setItalicTouched] = useState(preserve);
+  const [underlineTouched, setUnderlineTouched] = useState(preserve);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -55,7 +57,6 @@ export function MarkdownSelectionToolbar({
         left: rect.left + rect.width / 2,
         top: Math.max(8, rect.top - 10),
       }}
-      onMouseDown={(event) => event.preventDefault()}
       role="toolbar"
       aria-label="选中内容样式"
     >

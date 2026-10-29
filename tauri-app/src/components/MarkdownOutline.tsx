@@ -1,20 +1,27 @@
 import { FileText, ListTree } from "lucide-react";
 import type { MarkdownHeading } from "../lib/markdown";
+import type { CSSProperties } from "react";
+import type { MarkdownReadingSettings } from "../lib/markdown-settings";
+import { markdownSettingsVars } from "../lib/markdown-settings";
 
 interface MarkdownOutlineProps {
   headings: MarkdownHeading[];
   fileName: string;
   search: string;
+  settings: MarkdownReadingSettings;
 }
 
-export function MarkdownOutline({ headings, fileName, search }: MarkdownOutlineProps) {
+export function MarkdownOutline({ headings, fileName, search, settings }: MarkdownOutlineProps) {
   const needle = search.trim().toLocaleLowerCase();
   const visible = needle
     ? headings.filter((heading) => heading.text.toLocaleLowerCase().includes(needle))
     : headings;
 
   return (
-    <aside className="sidebar markdown-outline">
+    <aside
+      className="sidebar markdown-outline"
+      style={markdownSettingsVars(settings) as CSSProperties}
+    >
       <div className="sidebar-title">
         <span><ListTree size={16} />文档大纲</span>
         <span className="sidebar-count">{headings.length}</span>

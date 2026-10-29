@@ -52,6 +52,23 @@ try {
     await page.locator(".markdown-selection-toolbar").waitFor();
   };
 
+  const selectBlockText = async (needle, selector) => {
+    await page.evaluate(({ target, blockSelector }) => {
+      const block = Array.from(document.querySelectorAll(blockSelector))
+        .find((element) => element.textContent?.includes(target));
+      if (!block) throw new Error("target block not found");
+      const range = document.createRange();
+      range.selectNodeContents(block);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      document.querySelector(".markdown-view-scroll").dispatchEvent(
+        new MouseEvent("mouseup", { bubbles: true }),
+      );
+    }, { target: needle, blockSelector: selector });
+    await page.locator(".markdown-selection-toolbar").waitFor();
+  };
+
   await selectText("快速开始");
 
   const toolbar = page.locator(".markdown-selection-toolbar");
@@ -95,11 +112,21 @@ try {
   assert.equal(paragraphStyle.fontStyle, "italic");
   assert.match(paragraphStyle.textDecoration, /underline/);
 
+  await selectText("使用顶部“打开文件”");
+  await page.locator(".markdown-selection-toolbar select").first().selectOption("18px");
+  await page.locator(".markdown-selection-toolbar .markdown-selection-apply").click();
+  await selectBlockText("使用顶部“打开文件”打开单个 XML 或 Markdown 文件", ".markdown-body li");
+  await page.locator(".markdown-selection-toolbar .markdown-selection-icon").nth(1).click();
+  await page.locator(".markdown-selection-toolbar .markdown-selection-apply").click();
+  const mixedListText = await page.locator(".markdown-body li", { hasText: "使用顶部" }).innerText();
+  assert.match(mixedListText, /使用顶部“打开文件”打开单个 XML 或 Markdown 文件/);
+
   await page.keyboard.press("Control+E");
   await page.locator('[data-testid="markdown-editor"]').waitFor();
 
   const editorText = await page.locator('[data-testid="markdown-editor"] .cm-content').innerText();
-  assert.match(editorText, /<span style="font-size: 24px"><span style="font-weight: 400">快速开始<\/span><\/span>/);
+  assert.match(editorText, /<span style="font-size: 24px;.*font-weight: 400/);
+  assert.match(editorText, /font-style: italic/);
   const screenshot = path.join(outputDir, "markdown-local-style-1440x900.png");
   await page.screenshot({ path: screenshot, fullPage: true });
   console.log(JSON.stringify({

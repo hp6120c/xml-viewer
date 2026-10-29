@@ -18,6 +18,7 @@ import {
   type MarkdownContentWidth,
   type MarkdownFontFamily,
   type MarkdownHeadingStyle,
+  type MarkdownNavWeight,
   type MarkdownReadingSettings,
   type MarkdownTableStyle,
   type MarkdownTheme,
@@ -192,6 +193,44 @@ export function MarkdownSettingsPanel({
                 value={settings.imageRadius}
                 onChange={(event) => update("imageRadius", Number(event.target.value))}
               />
+            </label>
+          </section>
+
+          <section className="markdown-settings-section">
+            <div className="markdown-settings-section-title"><Type size={16} />左侧导航</div>
+            <label className="markdown-setting-row">
+              <span>导航字体</span>
+              <select
+                value={settings.navFontFamily}
+                onChange={(event) => update("navFontFamily", event.target.value as MarkdownFontFamily)}
+              >
+                <option value="system">系统无衬线</option>
+                <option value="serif">中文衬线</option>
+                <option value="mono">等宽字体</option>
+              </select>
+            </label>
+            <label className="markdown-setting-range">
+              <span>导航字号 <strong>{settings.navFontSize}px</strong></span>
+              <input
+                type="range"
+                min="11"
+                max="20"
+                step="1"
+                value={settings.navFontSize}
+                onChange={(event) => update("navFontSize", Number(event.target.value))}
+              />
+            </label>
+            <label className="markdown-setting-row">
+              <span>导航字重</span>
+              <select
+                value={settings.navFontWeight}
+                onChange={(event) => update("navFontWeight", event.target.value as MarkdownNavWeight)}
+              >
+                <option value="400">常规</option>
+                <option value="500">中等</option>
+                <option value="600">半粗</option>
+                <option value="700">粗体</option>
+              </select>
             </label>
           </section>
 

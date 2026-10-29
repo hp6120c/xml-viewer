@@ -1097,6 +1097,7 @@ function App() {
                 headings={markdownHeadings}
                 fileName={activeDocument.fileName}
                 search={search}
+                settings={markdownSettings}
               />
               <div
                 className="sidebar-resizer"

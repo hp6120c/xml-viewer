@@ -1,5 +1,6 @@
 export type MarkdownTheme = "light" | "dark" | "sepia";
 export type MarkdownFontFamily = "system" | "serif" | "mono";
+export type MarkdownNavWeight = "400" | "500" | "600" | "700";
 export type MarkdownContentWidth = "narrow" | "comfortable" | "wide" | "full";
 export type MarkdownContentPadding = "compact" | "standard" | "roomy";
 export type MarkdownHeadingStyle = "modern" | "compact" | "classic";
@@ -17,6 +18,9 @@ export interface MarkdownReadingSettings {
   headingStyle: MarkdownHeadingStyle;
   tableStyle: MarkdownTableStyle;
   imageRadius: number;
+  navFontFamily: MarkdownFontFamily;
+  navFontSize: number;
+  navFontWeight: MarkdownNavWeight;
   textColor: string;
   headingColor: string;
   linkColor: string;
@@ -36,6 +40,9 @@ export const DEFAULT_MARKDOWN_SETTINGS: MarkdownReadingSettings = {
   headingStyle: "modern",
   tableStyle: "striped",
   imageRadius: 7,
+  navFontFamily: "system",
+  navFontSize: 13,
+  navFontWeight: "500",
   textColor: "#30465b",
   headingColor: "#20384e",
   linkColor: "#1673c4",
@@ -99,6 +106,9 @@ export function loadMarkdownSettings(): MarkdownReadingSettings {
       imageRadius: isNumberInRange(parsed.imageRadius, 0, 24)
         ? parsed.imageRadius
         : DEFAULT_MARKDOWN_SETTINGS.imageRadius,
+      navFontSize: isNumberInRange(parsed.navFontSize, 11, 20)
+        ? parsed.navFontSize
+        : DEFAULT_MARKDOWN_SETTINGS.navFontSize,
     };
   } catch {
     return DEFAULT_MARKDOWN_SETTINGS;
@@ -139,6 +149,11 @@ export function markdownSettingsVars(
     serif: 'Georgia, "Noto Serif SC", "Songti SC", serif',
     mono: '"Cascadia Code", "JetBrains Mono", Consolas, monospace',
   }[settings.fontFamily];
+  const navFontFamily = {
+    system: '"Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", sans-serif',
+    serif: 'Georgia, "Noto Serif SC", "Songti SC", serif',
+    mono: '"Cascadia Code", "JetBrains Mono", Consolas, monospace',
+  }[settings.navFontFamily];
 
   return {
     "--md-font-size": `${settings.fontSize}px`,
@@ -154,5 +169,8 @@ export function markdownSettingsVars(
     "--md-bg": settings.backgroundColor,
     "--md-code-bg": settings.codeBackground,
     "--md-image-radius": `${settings.imageRadius}px`,
+    "--md-nav-font-family": navFontFamily,
+    "--md-nav-font-size": `${settings.navFontSize}px`,
+    "--md-nav-font-weight": settings.navFontWeight,
   };
 }
