@@ -3,7 +3,7 @@ use base64::engine::general_purpose::STANDARD;
 use encoding_rs::GB18030;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use std::fs;
+use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
@@ -323,6 +323,50 @@ pub fn scan_document_files(folder: &Path) -> Result<Vec<String>, String> {
     Ok(files)
 }
 
+pub fn create_document_file(path: &Path, kind: &str) -> Result<(), String> {
+    let (content, expected_extension) = match kind {
+        "markdown" => ("# 未命名文档\n\n", ["md", "markdown"].as_slice()),
+        "xml" => (
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root>\n</root>\n",
+            ["xml"].as_slice(),
+        ),
+        _ => return Err("不支持的新建文件类型".to_string()),
+    };
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    if !expected_extension
+        .iter()
+        .any(|value| value.eq_ignore_ascii_case(extension))
+    {
+        return Err(format!(
+            "新建文件扩展名必须为 {}",
+            expected_extension.join(" / ")
+        ));
+    }
+    if !path.is_absolute() {
+        return Err("新建文件必须使用绝对路径".to_string());
+    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| "无法确定新文件所在目录".to_string())?;
+    if !parent.is_dir() {
+        return Err("新文件所在目录不存在".to_string());
+    }
+
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .map_err(|error| format!("创建文件失败（文件可能已存在）: {error}"))?;
+    file.write_all(content.as_bytes())
+        .map_err(|error| format!("写入新文件失败: {error}"))?;
+    file.sync_all()
+        .map_err(|error| format!("同步新文件失败: {error}"))?;
+    Ok(())
+}
+
 pub fn document_paths_from_args(args: &[String], cwd: Option<&Path>) -> Vec<String> {
     let mut paths = Vec::new();
     for arg in args.iter().skip(1) {
@@ -447,6 +491,22 @@ mod tests {
             fs::read_to_string(&path).unwrap(),
             "# Changed by another editor\n"
         );
+    }
+
+    #[test]
+    fn creates_new_markdown_and_xml_files_without_overwriting() {
+        let dir = tempfile::tempdir().unwrap();
+        let markdown = dir.path().join("new.md");
+        let xml = dir.path().join("new.xml");
+        create_document_file(&markdown, "markdown").unwrap();
+        create_document_file(&xml, "xml").unwrap();
+        assert!(
+            fs::read_to_string(&markdown)
+                .unwrap()
+                .starts_with("# 未命名文档")
+        );
+        assert!(fs::read_to_string(&xml).unwrap().contains("<root>"));
+        assert!(create_document_file(&markdown, "markdown").is_err());
     }
 
     #[test]

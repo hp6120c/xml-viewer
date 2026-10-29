@@ -1,3 +1,4 @@
+mod file_association;
 mod text;
 mod xml;
 
@@ -69,8 +70,18 @@ fn save_markdown_file(
 }
 
 #[tauri::command]
+fn create_document_file(path: String, kind: String) -> Result<(), String> {
+    text::create_document_file(Path::new(&path), &kind)
+}
+
+#[tauri::command]
 fn read_markdown_asset(document_path: String, asset_path: String) -> Result<String, String> {
     text::read_markdown_asset(Path::new(&document_path), &asset_path)
+}
+
+#[tauri::command]
+fn register_file_associations() -> Result<(), String> {
+    file_association::register_file_associations()
 }
 
 #[tauri::command]
@@ -125,6 +136,13 @@ fn open_default_apps_settings() -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .manage(AppState::default())
+        .setup(|_| {
+            #[cfg(target_os = "windows")]
+            if let Err(error) = file_association::register_file_associations() {
+                eprintln!("register file associations failed: {error}");
+            }
+            Ok(())
+        })
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             let paths = text::document_paths_from_args(&argv, Some(Path::new(&cwd)));
             if !paths.is_empty() {
@@ -153,7 +171,9 @@ pub fn run() {
             scan_document_files,
             load_markdown_file,
             save_markdown_file,
+            create_document_file,
             read_markdown_asset,
+            register_file_associations,
             get_table_source,
             get_file_source,
             save_table_source,

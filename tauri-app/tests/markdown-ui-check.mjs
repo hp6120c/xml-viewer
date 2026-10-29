@@ -31,7 +31,7 @@ await page.addInitScript(() => {
 try {
   await page.goto("http://localhost:1420", { waitUntil: "networkidle" });
   await page.locator('[data-testid="markdown-view"]').waitFor();
-  await page.locator(".app-header h1", { hasText: "XML / Markdown 查看器" }).waitFor();
+  await page.locator(".app-header h1", { hasText: "XML / Markdown 编辑器" }).waitFor();
   await page.getByText("文档大纲", { exact: true }).waitFor();
   await page.getByText("Markdown", { exact: true }).first().waitFor();
 
@@ -82,6 +82,17 @@ try {
     fullPage: true,
   });
 
+  await page.locator(".toolbar .tool-button", { hasText: "全屏" }).click();
+  await page.locator(".app.fullscreen-mode").waitFor();
+  assert.equal(await page.locator(".app-header").isVisible(), false);
+  assert.equal(await page.locator(".toolbar").isVisible(), false);
+  assert.equal(await page.locator('[data-testid="tab-bar"]').isVisible(), true);
+  const fullscreenScreenshot = path.join(outputDir, "markdown-fullscreen-1440x900.png");
+  await page.screenshot({ path: fullscreenScreenshot, fullPage: true });
+  await page.locator(".fullscreen-exit").click();
+  await page.locator(".app.fullscreen-mode").waitFor({ state: "detached" });
+  assert.equal(await page.locator(".app-header").isVisible(), true);
+
   assert.deepEqual(pageErrors, [], `page errors: ${pageErrors.join("; ")}`);
   console.log(JSON.stringify({
     ok: true,
@@ -90,6 +101,7 @@ try {
     screenshots: [
       path.join(outputDir, "markdown-preview-1440x900.png"),
       path.join(outputDir, "markdown-editor-1440x900.png"),
+      fullscreenScreenshot,
     ],
   }, null, 2));
 } finally {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "XML数据库设计查看器",
+  "productName": "XML Markdown 编辑器",
   "version": "2.1.0",
   "identifier": "com.hp6120c.xmlviewer",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "XML / Markdown 查看器",
+        "title": "XML / Markdown 编辑器",
         "width": 1440,
         "height": 900,
         "minWidth": 1100,

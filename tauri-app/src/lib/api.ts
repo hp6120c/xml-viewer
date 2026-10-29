@@ -162,7 +162,7 @@ export function demoDocument(): XmlDocument {
 }
 
 export function demoMarkdownDocument(): MarkdownDocument {
-  const source = `# XML / Markdown 查看器
+  const source = `# XML / Markdown 编辑器
 
 支持 XML 数据库设计和 Markdown 文档阅读、编辑的桌面工具。
 
@@ -270,6 +270,29 @@ export async function chooseDocuments(): Promise<string[]> {
   return Array.isArray(selected) ? selected : [selected];
 }
 
+export type NewDocumentKind = "markdown" | "xml";
+
+export async function chooseNewDocument(kind: NewDocumentKind): Promise<string | null> {
+  if (!hasTauri()) return null;
+  const dialog = await import("@tauri-apps/plugin-dialog");
+  const selected = await dialog.save({
+    title: kind === "markdown" ? "新建 Markdown 文档" : "新建 XML 文档",
+    defaultPath: kind === "markdown" ? "未命名.md" : "未命名.xml",
+    filters: kind === "markdown"
+      ? [{ name: "Markdown 文件", extensions: ["md", "markdown"] }]
+      : [{ name: "XML 文件", extensions: ["xml"] }],
+  });
+  if (!selected) return null;
+  if (kind === "markdown" && !/\.(md|markdown)$/i.test(selected)) return `${selected}.md`;
+  if (kind === "xml" && !/\.xml$/i.test(selected)) return `${selected}.xml`;
+  return selected;
+}
+
+export async function createDocument(path: string, kind: NewDocumentKind): Promise<void> {
+  if (!hasTauri()) return;
+  await invoke("create_document_file", { path, kind });
+}
+
 export async function chooseFolder(): Promise<string | null> {
   if (!hasTauri()) return null;
   const dialog = await import("@tauri-apps/plugin-dialog");
@@ -352,6 +375,18 @@ export async function loadMarkdownAsset(documentPath: string, assetPath: string)
   return invoke<string>("read_markdown_asset", { documentPath, assetPath });
 }
 
+export async function getFullscreenState(): Promise<boolean> {
+  if (!hasTauri()) return false;
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  return getCurrentWindow().isFullscreen();
+}
+
+export async function setFullscreen(value: boolean): Promise<void> {
+  if (!hasTauri()) return;
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  await getCurrentWindow().setFullscreen(value);
+}
+
 export async function openExternalUrl(url: string): Promise<void> {
   if (!hasTauri()) {
     window.open(url, "_blank", "noopener,noreferrer");
@@ -363,6 +398,7 @@ export async function openExternalUrl(url: string): Promise<void> {
 
 export async function openDefaultAppsSettings(): Promise<void> {
   if (!hasTauri()) return;
+  await invoke("register_file_associations");
   await invoke("open_default_apps_settings");
 }
 

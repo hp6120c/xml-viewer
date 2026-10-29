@@ -281,7 +281,7 @@ export function parseMarkdown(source: string): ParsedMarkdown {
 }
 
 const markdown = new MarkdownIt({
-  html: false,
+  html: true,
   linkify: true,
   typographer: false,
   breaks: false,

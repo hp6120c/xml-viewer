@@ -1,6 +1,6 @@
-# XML / Markdown 查看器（Tauri 2）
+# XML / Markdown 编辑器（Tauri 2）
 
-这是 XML 数据库设计查看器和 Markdown 阅读器的 **V2.x 桌面版**。当前项目已从旧版 Python/PyQt5 架构迁移到 **Tauri 2 + React + TypeScript + Rust**，XML 表格和 Markdown 文档由 Windows WebView2 中的 Chromium 内核渲染，不再受 `QTextBrowser` 的排版能力限制。
+这是 XML 数据库设计编辑器和 Markdown 编辑器的 **V2.x 桌面版**。当前项目已从旧版 Python/PyQt5 架构迁移到 **Tauri 2 + React + TypeScript + Rust**，XML 表格和 Markdown 文档由 Windows WebView2 中的 Chromium 内核渲染，不再受 `QTextBrowser` 的排版能力限制。
 
 > 软件支持查看和轻量编辑 SCL Schema XML，也支持 CommonMark/GFM Markdown 的阅读和源码编辑。界面会自动识别 XML 数据库结构、模块、表、字段，并为 Markdown 提供大纲、预览和编辑模式。
 
@@ -41,6 +41,8 @@
 - Windows `.xml` 文件关联、双击打开和单实例文件转交。
 - Markdown 标题大纲、GFM 表格、任务列表、脚注、代码高亮和 Front Matter；
 - Markdown 预览 / 编辑切换、保存、相对链接与受限相对图片加载；
+- Markdown 预览选区局部样式：字号、字体、文字颜色、背景高亮、粗体、斜体、下划线；
+- 新建 Markdown / XML 文件、全屏模式（F11 / Esc 退出）和 Markdown 基础阅读样式；
 - Windows `.md` / `.markdown` 文件关联和混合文件标签页。
 
 ## 目录结构
@@ -211,8 +213,8 @@ ms-settings:defaultapps
 1. 打开“设置 → 应用 → 默认应用”；
 2. 选择“按文件类型选择默认应用”；
 3. 找到 `.xml`；
-4. 选择“XML 数据库设计查看器”；
-5. 也可以右键任意 XML 文件，选择“打开方式 → 选择其他应用”，勾选“始终使用此应用打开 .xml 文件”。
+4. 选择“XML / Markdown 编辑器”；
+5. 也可以右键任意 XML / Markdown 文件，选择“打开方式 → 选择其他应用”，勾选“始终使用此应用打开”；
 
 Windows 11 不同版本的默认应用页面布局可能略有差异，但都必须在系统 UI 中由用户确认。安装包注册文件关联不代表它已经成为默认应用。
 
@@ -236,7 +238,7 @@ Tauri 安装包会在 `tauri.conf.json` 中注册：
 用户将本程序设为 `.xml` 默认应用后，双击文件即可打开。程序也支持命令行一次传入一个或多个 XML：
 
 ```powershell
-& "<安装目录>\XML数据库设计查看器.exe" "C:\data\design-a.xml" "D:\specs\design-b.xml"
+& "<安装目录>\xml-database-viewer.exe" "C:\data\design-a.xml" "D:\specs\design-b.xml"
 ```
 
 路径包含空格时必须使用双引号。后端只接受实际存在且扩展名为 `.xml` 的文件路径，其他命令行参数会被忽略。

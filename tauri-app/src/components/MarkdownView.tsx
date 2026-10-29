@@ -1,7 +1,14 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
+import type { CSSProperties } from "react";
 import DOMPurify from "dompurify";
 import { loadMarkdownAsset } from "../lib/api";
+import {
+  MarkdownSelectionToolbar,
+  type MarkdownLocalStyle,
+} from "./MarkdownSelectionToolbar";
+import type { MarkdownReadingSettings } from "../lib/markdown-settings";
+import { markdownSettingsVars } from "../lib/markdown-settings";
 import {
   isExternalMarkdownUrl,
   isSafeMarkdownUrl,
@@ -14,6 +21,39 @@ export interface MarkdownViewProps {
   source: string;
   currentPath: string;
   onOpenLocalPath?: (path: string) => void;
+  onLocalStyleChange?: (source: string) => void;
+  onLocalStyleError?: (message: string) => void;
+  settings: MarkdownReadingSettings;
+}
+
+const ALLOWED_INLINE_STYLES = new Set([
+  "background-color",
+  "color",
+  "font-family",
+  "font-size",
+  "font-style",
+  "font-weight",
+  "line-height",
+  "margin-left",
+  "text-align",
+  "text-decoration",
+]);
+
+function sanitizeInlineStyles(root: ParentNode): void {
+  root.querySelectorAll<HTMLElement>("[style]").forEach((element) => {
+    const style = element.style;
+    for (let index = style.length - 1; index >= 0; index -= 1) {
+      const property = style.item(index);
+      const value = style.getPropertyValue(property).trim();
+      if (
+        !ALLOWED_INLINE_STYLES.has(property)
+        || /(?:url\s*\(|expression\s*\(|javascript:|@import|behavior\s*:)/i.test(value)
+      ) {
+        style.removeProperty(property);
+      }
+    }
+    if (!style.cssText.trim()) element.removeAttribute("style");
+  });
 }
 
 function safeExternalUrl(url: string): string | null {
@@ -43,10 +83,11 @@ function sanitizeMarkdownHtml(html: string): string {
   const sanitized = DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true },
     FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form", "meta", "link", "base"],
-    FORBID_ATTR: ["style", "srcset"],
+    FORBID_ATTR: ["srcset"],
   });
   const template = document.createElement("template");
   template.innerHTML = sanitized;
+  sanitizeInlineStyles(template.content);
 
   template.content.querySelectorAll<HTMLAnchorElement>("a[href]").forEach((link) => {
     const href = link.getAttribute("href") ?? "";
@@ -96,8 +137,48 @@ function scrollToHeading(container: HTMLElement, hash: string): boolean {
   return true;
 }
 
-export function MarkdownView({ source, currentPath, onOpenLocalPath }: MarkdownViewProps) {
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function localStyleHtml(text: string, style: MarkdownLocalStyle): string {
+  const declarations: string[] = [];
+  if (style.fontSize) declarations.push(`font-size: ${style.fontSize}`);
+  if (style.fontFamily) {
+    const family = {
+      system: '"Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", sans-serif',
+      serif: 'Georgia, "Noto Serif SC", "Songti SC", serif',
+      mono: '"Cascadia Code", Consolas, monospace',
+    }[style.fontFamily] ?? style.fontFamily;
+    declarations.push(`font-family: ${family}`);
+  }
+  if (style.color) declarations.push(`color: ${style.color}`);
+  if (style.backgroundColor) declarations.push(`background-color: ${style.backgroundColor}`);
+  if (style.bold) declarations.push("font-weight: 700");
+  if (style.italic) declarations.push("font-style: italic");
+  if (style.underline) declarations.push("text-decoration: underline");
+  const styleAttribute = declarations.length > 0
+    ? ` style="${escapeHtml(declarations.join("; "))}"`
+    : "";
+  return `<span${styleAttribute}>${escapeHtml(text)}</span>`;
+}
+
+export function MarkdownView({
+  source,
+  currentPath,
+  onOpenLocalPath,
+  onLocalStyleChange,
+  onLocalStyleError,
+  settings,
+}: MarkdownViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const selectionRef = useRef<Range | null>(null);
+  const [selection, setSelection] = useState<{ rect: DOMRect; text: string } | null>(null);
   const rendered = useMemo(() => parseMarkdown(source), [source]);
   const sanitizedHtml = useMemo(() => sanitizeMarkdownHtml(rendered.html), [rendered.html]);
 
@@ -165,15 +246,73 @@ export function MarkdownView({ source, currentPath, onOpenLocalPath }: MarkdownV
     if (localPath) onOpenLocalPath?.(localPath);
   };
 
+  const captureSelection = () => {
+    const container = scrollRef.current;
+    const selected = window.getSelection();
+    if (!container || !selected || selected.rangeCount === 0) {
+      selectionRef.current = null;
+      setSelection(null);
+      return;
+    }
+    const range = selected.getRangeAt(0);
+    const text = selected.toString().trim();
+    if (
+      range.collapsed
+      || !text
+      || !container.contains(range.commonAncestorContainer)
+    ) {
+      selectionRef.current = null;
+      setSelection(null);
+      return;
+    }
+    selectionRef.current = range.cloneRange();
+    setSelection({ rect: range.getBoundingClientRect(), text });
+  };
+
+  const applyLocalStyle = (style: MarkdownLocalStyle) => {
+    const selected = selectionRef.current;
+    const text = selected?.toString().trim() ?? "";
+    if (!text || !onLocalStyleChange) return;
+    const first = source.indexOf(text);
+    if (first < 0 || source.indexOf(text, first + text.length) >= 0) {
+      onLocalStyleError?.("当前选区不是唯一的纯文本片段，请只选择同一段落内的一段文字");
+      return;
+    }
+    const nextSource = `${source.slice(0, first)}${localStyleHtml(text, style)}${source.slice(first + text.length)}`;
+    onLocalStyleChange(nextSource);
+    selectionRef.current = null;
+    setSelection(null);
+    window.getSelection()?.removeAllRanges();
+  };
+
   return (
-    <div className="markdown-view" data-testid="markdown-view">
-      <div ref={scrollRef} className="markdown-view-scroll">
+    <div
+      className={`markdown-view markdown-theme-${settings.theme} markdown-heading-${settings.headingStyle} markdown-table-${settings.tableStyle}`}
+      data-testid="markdown-view"
+      style={markdownSettingsVars(settings) as CSSProperties}
+    >
+      <div
+        ref={scrollRef}
+        className="markdown-view-scroll"
+        onMouseUp={captureSelection}
+        onKeyUp={captureSelection}
+      >
         <article
           className="markdown-body"
           onClick={handleClick}
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
       </div>
+      {selection && (
+        <MarkdownSelectionToolbar
+          rect={selection.rect}
+          onApply={applyLocalStyle}
+          onClose={() => {
+            selectionRef.current = null;
+            setSelection(null);
+          }}
+        />
+      )}
     </div>
   );
 }

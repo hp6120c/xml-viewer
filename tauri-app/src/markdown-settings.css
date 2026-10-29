@@ -1,0 +1,250 @@
+.markdown-settings-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.markdown-settings-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(26, 45, 64, 0.28);
+  cursor: default;
+}
+
+.markdown-settings-panel {
+  position: relative;
+  width: min(390px, calc(100vw - 24px));
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #d5e1eb;
+  background: #fff;
+  box-shadow: -14px 0 34px rgba(25, 49, 72, 0.14);
+  color: #2c445a;
+}
+
+.markdown-settings-heading {
+  padding: 20px 20px 15px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #e1e9f0;
+}
+
+.markdown-settings-heading h2 {
+  margin: 4px 0 4px;
+  color: #20384e;
+  font-size: 21px;
+  font-weight: 600;
+}
+
+.markdown-settings-heading p {
+  margin: 0;
+  color: #8294a5;
+  font-size: 11.5px;
+}
+
+.markdown-settings-close {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d9e3ec;
+  border-radius: 6px;
+  background: #fff;
+  color: #657c90;
+  cursor: pointer;
+}
+
+.markdown-settings-close:hover {
+  color: #1973c7;
+  border-color: #9fc5e9;
+  background: #f2f8ff;
+}
+
+.markdown-settings-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 20px 20px;
+}
+
+.markdown-settings-section {
+  padding: 16px 0;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.markdown-settings-section-title {
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #344f67;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.markdown-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.markdown-theme-card {
+  min-width: 0;
+  padding: 7px;
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  border: 1px solid #dbe5ee;
+  border-radius: 7px;
+  background: #fff;
+  color: #60778b;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.markdown-theme-card:hover,
+.markdown-theme-card.active {
+  border-color: #75b5ec;
+  background: #f4f9ff;
+  color: #1973c7;
+}
+
+.markdown-theme-swatch {
+  width: 100%;
+  height: 30px;
+  display: block;
+  border: 1px solid rgba(32, 56, 78, 0.1);
+  border-radius: 4px;
+}
+
+.markdown-theme-card.theme-light .markdown-theme-swatch {
+  background: #fff;
+}
+
+.markdown-theme-card.theme-dark .markdown-theme-swatch {
+  background: #121a23;
+}
+
+.markdown-theme-card.theme-sepia .markdown-theme-swatch {
+  background: #f7f0df;
+}
+
+.markdown-theme-card > span:not(.markdown-theme-swatch) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.markdown-setting-row {
+  min-height: 32px;
+  margin: 7px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #5c7286;
+  font-size: 11.5px;
+}
+
+.markdown-setting-row select {
+  width: 165px;
+  min-height: 29px;
+  padding: 0 7px;
+  border: 1px solid #d4e0ea;
+  border-radius: 5px;
+  color: #355069;
+  background: #fff;
+  font-size: 11px;
+}
+
+.markdown-setting-range {
+  margin: 9px 0;
+  display: grid;
+  gap: 5px;
+  color: #5c7286;
+  font-size: 11.5px;
+}
+
+.markdown-setting-range > span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.markdown-setting-range strong {
+  color: #2a4d6a;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.markdown-setting-range input[type="range"] {
+  width: 100%;
+  accent-color: #2588e8;
+}
+
+.markdown-color-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.markdown-color-grid label {
+  min-width: 0;
+  padding: 7px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  border: 1px solid #e0e8ef;
+  border-radius: 6px;
+  color: #63798d;
+  font-size: 10.5px;
+}
+
+.markdown-color-grid input[type="color"] {
+  width: 29px;
+  height: 22px;
+  padding: 1px;
+  border: 1px solid #d2dee8;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.markdown-settings-about {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-bottom: 0;
+  color: #8a9bab;
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+
+.markdown-settings-about p {
+  margin: 0;
+}
+
+.markdown-settings-footer {
+  min-height: 62px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid #e1e9f0;
+  background: #fbfcfd;
+}
+
+.markdown-settings-footer .secondary-button,
+.markdown-settings-footer .primary-button {
+  min-height: 34px;
+  gap: 5px;
+  font-size: 11px;
+}

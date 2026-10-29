@@ -15,8 +15,12 @@
     "test:markdown-e2e": "node tests/markdown-e2e.mjs",
     "test:markdown-conflict": "node tests/markdown-conflict-check.mjs",
     "test:markdown-assets": "node tests/markdown-assets-check.mjs",
+    "test:markdown-local-style": "node tests/markdown-local-style-check.mjs",
+    "test:markdown-settings": "node tests/markdown-settings-check.mjs",
     "test:mixed-tabs": "node tests/mixed-tabs-check.mjs",
-    "test:update": "node tests/update-check.mjs"
+    "test:new-file": "node tests/new-file-e2e.mjs",
+    "test:update": "node tests/update-check.mjs",
+    "test:fullscreen": "node tests/fullscreen-e2e.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.4",
