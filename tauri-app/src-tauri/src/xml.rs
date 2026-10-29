@@ -4,7 +4,7 @@ use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tempfile::NamedTempFile;
 use walkdir::WalkDir;
 
@@ -729,29 +729,6 @@ pub fn scan_xml_files(folder: &Path) -> Result<Vec<String>, String> {
     }
     files.sort_by_cached_key(|value| value.to_lowercase());
     Ok(files)
-}
-
-pub fn xml_paths_from_args(args: &[String]) -> Vec<String> {
-    let mut paths = Vec::new();
-    for arg in args.iter().skip(1) {
-        if arg.starts_with('-') {
-            continue;
-        }
-        let path = PathBuf::from(arg);
-        if path.is_file()
-            && path
-                .extension()
-                .and_then(|value| value.to_str())
-                .is_some_and(|value| value.eq_ignore_ascii_case("xml"))
-        {
-            if let Ok(canonical) = path.canonicalize() {
-                paths.push(canonical.to_string_lossy().into_owned());
-            }
-        }
-    }
-    paths.sort();
-    paths.dedup();
-    paths
 }
 
 #[cfg(test)]

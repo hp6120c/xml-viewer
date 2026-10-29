@@ -1,9 +1,11 @@
+mod text;
 mod xml;
 
 use serde::Serialize;
 use std::path::Path;
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State};
+use text::MarkdownDocument;
 use xml::{FileSource, TableSource, XmlDocument};
 
 #[derive(Default)]
@@ -27,7 +29,8 @@ fn get_app_info() -> AppInfo {
 #[tauri::command]
 fn get_launch_paths(state: State<'_, AppState>) -> Vec<String> {
     let args: Vec<String> = std::env::args().collect();
-    let mut paths = xml::xml_paths_from_args(&args);
+    let cwd = std::env::current_dir().ok();
+    let mut paths = text::document_paths_from_args(&args, cwd.as_deref());
     if let Ok(mut pending) = state.pending_paths.lock() {
         paths.append(&mut pending);
     }
@@ -44,6 +47,30 @@ fn load_xml_file(path: String) -> Result<XmlDocument, String> {
 #[tauri::command]
 fn scan_xml_files(folder: String) -> Result<Vec<String>, String> {
     xml::scan_xml_files(Path::new(&folder))
+}
+
+#[tauri::command]
+fn scan_document_files(folder: String) -> Result<Vec<String>, String> {
+    text::scan_document_files(Path::new(&folder))
+}
+
+#[tauri::command]
+fn load_markdown_file(path: String) -> Result<MarkdownDocument, String> {
+    text::load_markdown_file(Path::new(&path))
+}
+
+#[tauri::command]
+fn save_markdown_file(
+    path: String,
+    new_source: String,
+    expected_hash: String,
+) -> Result<MarkdownDocument, String> {
+    text::save_markdown_file(Path::new(&path), &new_source, &expected_hash)
+}
+
+#[tauri::command]
+fn read_markdown_asset(document_path: String, asset_path: String) -> Result<String, String> {
+    text::read_markdown_asset(Path::new(&document_path), &asset_path)
 }
 
 #[tauri::command]
@@ -98,15 +125,15 @@ fn open_default_apps_settings() -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .manage(AppState::default())
-        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            let paths = xml::xml_paths_from_args(&argv);
+        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+            let paths = text::document_paths_from_args(&argv, Some(Path::new(&cwd)));
             if !paths.is_empty() {
                 if let Some(state) = app.try_state::<AppState>() {
                     if let Ok(mut pending) = state.pending_paths.lock() {
                         pending.extend(paths.iter().cloned());
                     }
                 }
-                let _ = app.emit("open-xml-files", paths);
+                let _ = app.emit("open-files", paths);
             }
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
@@ -123,6 +150,10 @@ pub fn run() {
             get_launch_paths,
             load_xml_file,
             scan_xml_files,
+            scan_document_files,
+            load_markdown_file,
+            save_markdown_file,
+            read_markdown_asset,
             get_table_source,
             get_file_source,
             save_table_source,

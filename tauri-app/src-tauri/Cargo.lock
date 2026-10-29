@@ -5275,12 +5275,14 @@ dependencies = [
 
 [[package]]
 name = "xml-database-viewer"
-version = "2.0.1"
+version = "2.1.0"
 dependencies = [
+ "base64 0.22.1",
  "encoding_rs",
  "roxmltree",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",

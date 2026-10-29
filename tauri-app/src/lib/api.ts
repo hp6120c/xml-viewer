@@ -1,4 +1,12 @@
-import type { AppInfo, ColumnInfo, TableInfo, TableSource, XmlDocument } from "../types";
+import type {
+  AppInfo,
+  ColumnInfo,
+  MarkdownDocument,
+  OpenedDocument,
+  TableInfo,
+  TableSource,
+  XmlDocument,
+} from "../types";
 
 function hasTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -153,8 +161,52 @@ export function demoDocument(): XmlDocument {
   };
 }
 
+export function demoMarkdownDocument(): MarkdownDocument {
+  const source = `# XML / Markdown 查看器
+
+支持 XML 数据库设计和 Markdown 文档阅读、编辑的桌面工具。
+
+## 快速开始
+
+- 使用顶部“打开文件”打开单个 XML 或 Markdown 文件
+- 使用“打开文件夹”浏览同一目录中的多种文档
+- 标签页保留各自的查看位置
+
+## 目录结构
+
+\`\`\`text
+xml-viewer/
+├─ tauri-app/     # 桌面应用
+├─ docs/          # 文档与设计记录
+└─ outputs/       # 构建与验收产物
+\`\`\`
+
+## 主要功能
+
+| 文件类型 | 阅读方式 | 编辑方式 |
+| --- | --- | --- |
+| XML | 数据库、表、字段结构 | 单表 XML 编辑 |
+| Markdown | 大纲与渲染文档 | 源码与实时预览 |
+
+## 常见问题
+
+- [x] 支持多文件标签
+- [x] 支持 Markdown 源码编辑
+- [ ] 支持导出 PDF（后续版本）
+`;
+  return {
+    path: "demo://README.md",
+    fileName: "README.md",
+    fileSize: new Blob([source]).size,
+    encoding: "UTF-8",
+    kind: "markdown",
+    source,
+    contentHash: `demo-${source.length}`,
+  };
+}
+
 export async function getAppInfo(): Promise<AppInfo> {
-  if (!hasTauri()) return { version: "2.0.0-demo" };
+  if (!hasTauri()) return { version: "2.1.0-demo" };
   return invoke<AppInfo>("get_app_info");
 }
 
@@ -168,9 +220,28 @@ export async function loadXmlFile(path: string): Promise<XmlDocument> {
   return invoke<XmlDocument>("load_xml_file", { path });
 }
 
+export function isMarkdownPath(path: string): boolean {
+  return /\.(md|markdown)$/i.test(path);
+}
+
+export async function loadDocument(path: string): Promise<OpenedDocument> {
+  if (!hasTauri()) {
+    return isMarkdownPath(path) ? demoMarkdownDocument() : demoDocument();
+  }
+  if (isMarkdownPath(path)) {
+    return invoke<MarkdownDocument>("load_markdown_file", { path });
+  }
+  return invoke<XmlDocument>("load_xml_file", { path });
+}
+
 export async function scanXmlFiles(folder: string): Promise<string[]> {
   if (!hasTauri()) return [demoDocument().path];
   return invoke<string[]>("scan_xml_files", { folder });
+}
+
+export async function scanDocuments(folder: string): Promise<string[]> {
+  if (!hasTauri()) return [demoDocument().path];
+  return invoke<string[]>("scan_document_files", { folder });
 }
 
 export async function chooseXmlFiles(): Promise<string[]> {
@@ -186,11 +257,24 @@ export async function chooseXmlFiles(): Promise<string[]> {
   return Array.isArray(selected) ? selected : [selected];
 }
 
+export async function chooseDocuments(): Promise<string[]> {
+  if (!hasTauri()) return [demoDocument().path];
+  const dialog = await import("@tauri-apps/plugin-dialog");
+  const selected = await dialog.open({
+    title: "选择 XML 或 Markdown 文件",
+    multiple: true,
+    directory: false,
+    filters: [{ name: "XML / Markdown 文件", extensions: ["xml", "md", "markdown"] }],
+  });
+  if (!selected) return [];
+  return Array.isArray(selected) ? selected : [selected];
+}
+
 export async function chooseFolder(): Promise<string | null> {
   if (!hasTauri()) return null;
   const dialog = await import("@tauri-apps/plugin-dialog");
   const selected = await dialog.open({
-    title: "选择包含 XML 文件的文件夹",
+    title: "选择包含 XML 或 Markdown 文件的文件夹",
     multiple: false,
     directory: true,
   });
@@ -240,6 +324,34 @@ export async function saveTableSource(
   });
 }
 
+export async function saveMarkdownFile(
+  path: string,
+  source: string,
+  expectedHash: string,
+): Promise<MarkdownDocument> {
+  if (!hasTauri()) {
+    return {
+      path,
+      fileName: path.split(/[\\/]/).pop() ?? "untitled.md",
+      fileSize: new Blob([source]).size,
+      encoding: "UTF-8",
+      kind: "markdown",
+      source,
+      contentHash: `demo-${source.length}`,
+    };
+  }
+  return invoke<MarkdownDocument>("save_markdown_file", {
+    path,
+    newSource: source,
+    expectedHash,
+  });
+}
+
+export async function loadMarkdownAsset(documentPath: string, assetPath: string): Promise<string> {
+  if (!hasTauri()) return "";
+  return invoke<string>("read_markdown_asset", { documentPath, assetPath });
+}
+
 export async function openExternalUrl(url: string): Promise<void> {
   if (!hasTauri()) {
     window.open(url, "_blank", "noopener,noreferrer");
@@ -259,7 +371,7 @@ export async function listenForOpenFiles(
 ): Promise<() => void> {
   if (!hasTauri()) return () => undefined;
   const event = await import("@tauri-apps/api/event");
-  return event.listen<string[]>("open-xml-files", (incoming) => handler(incoming.payload));
+  return event.listen<string[]>("open-files", (incoming) => handler(incoming.payload));
 }
 
 export function isDesktopApp(): boolean {

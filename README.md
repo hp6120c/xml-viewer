@@ -1,6 +1,6 @@
-# XML 数据库设计查看器
+# XML / Markdown 查看器
 
-当前主版本为 **V2.0.1**，架构为 **Tauri 2 + React + TypeScript + Rust**，运行在 Windows WebView2/Chromium 上。新的 UI 使用标准 HTML/CSS 自适应布局，右侧表目录和字段表会铺满内容区，并支持窗口缩放。
+当前测试版本为 **V2.1.0**，架构为 **Tauri 2 + React + TypeScript + Rust**，运行在 Windows WebView2/Chromium 上。本版本在 XML 数据库查看器基础上增加 Markdown 阅读和编辑能力，使用标准 HTML/CSS 自适应布局。
 
 ## 目录
 
@@ -16,11 +16,14 @@
 - 单表编辑、XML 结构校验、按表序号和 ID 双重定位、原子写回
 - 未保存修改切换/关闭保护，编辑期间保存竞态保护
 - 通用 XML 回退查看模式（非 SCL 文件不再显示为空目录）
+- Markdown 阅读：GFM 表格、任务列表、脚注、代码高亮、YAML Front Matter、标题大纲
+- Markdown 源码编辑、未保存保护、原编码/BOM/换行风格保留和原子写回
+- Markdown 相对图片安全加载，仅允许读取当前 Markdown 文件目录内的资源
 - 自适应窗口布局、缩放、标签页右键菜单
-- Windows `.xml` 文件关联、命令行/双击打开、单实例转交
+- Windows `.xml` / `.md` / `.markdown` 文件关联、命令行/双击打开、单实例转交
 - GitHub 项目链接跳转
 - Tauri Updater v2 签名更新与 GitHub Release `latest.json`
-- “设为默认”按钮打开 Windows 默认应用设置；Windows 不允许程序静默绕过用户选择默认应用
+- “默认应用设置”按钮打开 Windows 默认应用设置；Windows 不允许程序静默绕过用户选择默认应用
 
 ## 快速开始
 
