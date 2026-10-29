@@ -51,6 +51,8 @@ try {
 
   const toolbar = page.locator(".markdown-selection-toolbar");
   await toolbar.waitFor();
+  const toolbarScreenshot = path.join(outputDir, "markdown-selection-toolbar-1440x900.png");
+  await page.screenshot({ path: toolbarScreenshot, fullPage: true });
   await toolbar.locator("select").first().selectOption("24px");
   await toolbar.locator(".markdown-selection-apply").click();
   const previewFontSize = await page
@@ -65,7 +67,13 @@ try {
   assert.match(editorText, /<span style="font-size: 24px">快速开始<\/span>/);
   const screenshot = path.join(outputDir, "markdown-local-style-1440x900.png");
   await page.screenshot({ path: screenshot, fullPage: true });
-  console.log(JSON.stringify({ ok: true, previewFontSize, editorText: editorText.slice(0, 260), screenshot }, null, 2));
+  console.log(JSON.stringify({
+    ok: true,
+    previewFontSize,
+    editorText: editorText.slice(0, 260),
+    toolbarScreenshot,
+    screenshot,
+  }, null, 2));
 } finally {
   await browser.close();
 }
