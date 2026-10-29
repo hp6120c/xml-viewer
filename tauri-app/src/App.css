@@ -353,7 +353,7 @@ input:focus-visible {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: 278px minmax(0, 1fr);
+  grid-template-columns: clamp(200px, var(--sidebar-width, 278px), 520px) 6px minmax(0, 1fr);
   background: #eef3f8;
 }
 
@@ -1291,7 +1291,7 @@ input:focus-visible {
 
 @media (max-width: 1180px) {
   .workspace {
-    grid-template-columns: 244px minmax(0, 1fr);
+    grid-template-columns: clamp(200px, var(--sidebar-width, 244px), 45vw) 6px minmax(0, 1fr);
   }
 
   .page {
@@ -1310,7 +1310,7 @@ input:focus-visible {
 
 @media (max-width: 1000px) {
   .workspace {
-    grid-template-columns: 224px minmax(0, 1fr);
+    grid-template-columns: clamp(200px, var(--sidebar-width, 224px), 45vw) 6px minmax(0, 1fr);
   }
 
   .brand span {
@@ -1468,7 +1468,28 @@ input:focus-visible {
 }
 
 .workspace.markdown-workspace {
-  grid-template-columns: 230px minmax(0, 1fr);
+  grid-template-columns: clamp(200px, var(--sidebar-width, 260px), 520px) 6px minmax(0, 1fr);
+}
+
+.sidebar-resizer {
+  position: relative;
+  z-index: 2;
+  min-height: 0;
+  border-right: 1px solid #cfdbe7;
+  background: #eef3f8;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.sidebar-resizer::after {
+  content: "";
+  position: absolute;
+  inset: 0 -3px;
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer:active {
+  background: #cfe5f8;
 }
 
 .markdown-outline .sidebar-title {

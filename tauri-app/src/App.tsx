@@ -8,6 +8,7 @@ import {
   useState,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 
 import {
@@ -146,6 +147,9 @@ function App() {
   const [markdownSettings, setMarkdownSettings] = useState(loadMarkdownSettings);
   const [markdownSettingsOpen, setMarkdownSettingsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [sidebarWidths, setSidebarWidths] = useState(
+    () => initialSession.current?.sidebarWidths ?? { xml: 278, markdown: 260 },
+  );
 
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
@@ -160,6 +164,7 @@ function App() {
   const pendingOpenPathsRef = useRef<string[]>([]);
   const updateCheckingRef = useRef(false);
   const autoUpdateCheckedRef = useRef(false);
+  const resizingSidebarRef = useRef(false);
 
   const activeDocument = useMemo(
     () => documents.find((document) => document.path === activePath) ?? null,
@@ -220,6 +225,35 @@ function App() {
     }
   }, [isFullscreen]);
 
+  const sidebarWidth = activeDocument?.kind === "markdown"
+    ? sidebarWidths.markdown
+    : sidebarWidths.xml;
+
+  const startSidebarResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    resizingSidebarRef.current = true;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, []);
+
+  const moveSidebarResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!resizingSidebarRef.current) return;
+    const workspace = event.currentTarget.parentElement;
+    if (!workspace) return;
+    const rect = workspace.getBoundingClientRect();
+    const scale = zoom / 100;
+    const next = Math.min(520, Math.max(200, (event.clientX - rect.left) / scale));
+    const key = activeDocument?.kind === "markdown" ? "markdown" : "xml";
+    setSidebarWidths((current) => ({ ...current, [key]: next }));
+  }, [activeDocument, zoom]);
+
+  const stopSidebarResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!resizingSidebarRef.current) return;
+    resizingSidebarRef.current = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }, []);
+
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 4200);
@@ -242,8 +276,9 @@ function App() {
       paths: documents.map((document) => document.path).filter((path) => !path.startsWith("demo:")),
       activePath: activePath?.startsWith("demo:") ? null : activePath,
       zoom,
+      sidebarWidths,
     });
-  }, [documents, activePath, zoom, sessionReady]);
+  }, [activePath, documents, sessionReady, sidebarWidths, zoom]);
 
   const resetWorkspaceView = useCallback((markdown = false) => {
     editRequestRef.current += 1;
@@ -1051,7 +1086,10 @@ function App() {
           <Minimize2 size={15} />退出全屏
         </button>
       )}
-      <main className={`workspace ${activeDocument?.kind === "xml" ? "generic-workspace" : ""} ${activeDocument?.kind === "markdown" ? "markdown-workspace" : ""} ${activeDocument ? "" : "empty-workspace"}`}>
+      <main
+        className={`workspace ${activeDocument?.kind === "xml" ? "generic-workspace" : ""} ${activeDocument?.kind === "markdown" ? "markdown-workspace" : ""} ${activeDocument ? "" : "empty-workspace"}`}
+        style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
+      >
         {activeDocument ? (
           activeDocument.kind === "markdown" ? (
             <>
@@ -1059,6 +1097,16 @@ function App() {
                 headings={markdownHeadings}
                 fileName={activeDocument.fileName}
                 search={search}
+              />
+              <div
+                className="sidebar-resizer"
+                role="separator"
+                aria-label="调整 Markdown 导航栏宽度"
+                aria-orientation="vertical"
+                onPointerDown={startSidebarResize}
+                onPointerMove={moveSidebarResize}
+                onPointerUp={stopSidebarResize}
+                onPointerCancel={stopSidebarResize}
               />
               <section className="content-pane markdown-content-pane" data-testid="content-pane">
                 {mode === "markdown-edit" ? (
@@ -1116,6 +1164,16 @@ function App() {
                 search={search}
                 selectedTableIndex={selectedTableIndex}
                 onSelectTable={(table) => void selectTable(table)}
+              />
+              <div
+                className="sidebar-resizer"
+                role="separator"
+                aria-label="调整 XML 数据表导航栏宽度"
+                aria-orientation="vertical"
+                onPointerDown={startSidebarResize}
+                onPointerMove={moveSidebarResize}
+                onPointerUp={stopSidebarResize}
+                onPointerCancel={stopSidebarResize}
               />
               <section className="content-pane" data-testid="content-pane">
                 {mode === "overview" && (

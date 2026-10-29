@@ -14,24 +14,31 @@ export interface MarkdownLocalStyle {
 
 interface MarkdownSelectionToolbarProps {
   rect: DOMRect;
+  initialStyle: MarkdownLocalStyle;
   onApply: (style: MarkdownLocalStyle) => void;
   onClose: () => void;
 }
 
 export function MarkdownSelectionToolbar({
   rect,
+  initialStyle,
   onApply,
   onClose,
 }: MarkdownSelectionToolbarProps) {
-  const [fontSize, setFontSize] = useState("");
-  const [fontFamily, setFontFamily] = useState("");
-  const [color, setColor] = useState("#20384e");
-  const [backgroundColor, setBackgroundColor] = useState("#fff0a8");
+  const [fontSize, setFontSize] = useState(initialStyle.fontSize ?? "");
+  const [fontFamily, setFontFamily] = useState(initialStyle.fontFamily ?? "");
+  const [color, setColor] = useState(initialStyle.color ?? "#20384e");
+  const [backgroundColor, setBackgroundColor] = useState(initialStyle.backgroundColor ?? "#fff0a8");
+  const [fontSizeTouched, setFontSizeTouched] = useState(false);
+  const [fontFamilyTouched, setFontFamilyTouched] = useState(false);
   const [colorTouched, setColorTouched] = useState(false);
   const [backgroundTouched, setBackgroundTouched] = useState(false);
-  const [bold, setBold] = useState(false);
-  const [italic, setItalic] = useState(false);
-  const [underline, setUnderline] = useState(false);
+  const [bold, setBold] = useState(Boolean(initialStyle.bold));
+  const [italic, setItalic] = useState(Boolean(initialStyle.italic));
+  const [underline, setUnderline] = useState(Boolean(initialStyle.underline));
+  const [boldTouched, setBoldTouched] = useState(false);
+  const [italicTouched, setItalicTouched] = useState(false);
+  const [underlineTouched, setUnderlineTouched] = useState(false);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -57,7 +64,10 @@ export function MarkdownSelectionToolbar({
         <button
           type="button"
           className={`markdown-selection-icon ${bold ? "active" : ""}`}
-          onClick={() => setBold((value) => !value)}
+          onClick={() => {
+            setBold((value) => !value);
+            setBoldTouched(true);
+          }}
           aria-label="加粗"
           title="加粗"
         >
@@ -66,7 +76,10 @@ export function MarkdownSelectionToolbar({
         <button
           type="button"
           className={`markdown-selection-icon ${italic ? "active" : ""}`}
-          onClick={() => setItalic((value) => !value)}
+          onClick={() => {
+            setItalic((value) => !value);
+            setItalicTouched(true);
+          }}
           aria-label="斜体"
           title="斜体"
         >
@@ -75,7 +88,10 @@ export function MarkdownSelectionToolbar({
         <button
           type="button"
           className={`markdown-selection-icon ${underline ? "active" : ""}`}
-          onClick={() => setUnderline((value) => !value)}
+          onClick={() => {
+            setUnderline((value) => !value);
+            setUnderlineTouched(true);
+          }}
           aria-label="下划线"
           title="下划线"
         >
@@ -84,7 +100,10 @@ export function MarkdownSelectionToolbar({
         <span className="markdown-selection-divider" />
         <select
           value={fontSize}
-          onChange={(event) => setFontSize(event.target.value)}
+          onChange={(event) => {
+            setFontSize(event.target.value);
+            setFontSizeTouched(true);
+          }}
           aria-label="选中内容字号"
         >
           <option value="">字号</option>
@@ -99,7 +118,10 @@ export function MarkdownSelectionToolbar({
         </select>
         <select
           value={fontFamily}
-          onChange={(event) => setFontFamily(event.target.value)}
+          onChange={(event) => {
+            setFontFamily(event.target.value);
+            setFontFamilyTouched(true);
+          }}
           aria-label="选中内容字体"
         >
           <option value="">字体</option>
@@ -135,13 +157,13 @@ export function MarkdownSelectionToolbar({
           type="button"
           className="markdown-selection-apply"
           onClick={() => onApply({
-            fontSize: fontSize || undefined,
-            fontFamily: fontFamily || undefined,
+            fontSize: fontSizeTouched ? fontSize || undefined : undefined,
+            fontFamily: fontFamilyTouched ? fontFamily || undefined : undefined,
             color: colorTouched ? color : undefined,
             backgroundColor: backgroundTouched ? backgroundColor : undefined,
-            bold,
-            italic,
-            underline,
+            bold: boldTouched ? bold : undefined,
+            italic: italicTouched ? italic : undefined,
+            underline: underlineTouched ? underline : undefined,
           })}
         >
           <Check size={14} />应用

@@ -37,6 +37,7 @@ const ALLOWED_INLINE_STYLES = new Set([
   "margin-left",
   "text-align",
   "text-decoration",
+  "text-decoration-line",
 ]);
 
 function sanitizeInlineStyles(root: ParentNode): void {
@@ -159,13 +160,51 @@ function localStyleHtml(text: string, style: MarkdownLocalStyle): string {
   }
   if (style.color) declarations.push(`color: ${style.color}`);
   if (style.backgroundColor) declarations.push(`background-color: ${style.backgroundColor}`);
-  if (style.bold) declarations.push("font-weight: 700");
-  if (style.italic) declarations.push("font-style: italic");
-  if (style.underline) declarations.push("text-decoration: underline");
+  if (style.bold !== undefined) {
+    declarations.push(`font-weight: ${style.bold ? "700" : "400"}`);
+  }
+  if (style.italic !== undefined) {
+    declarations.push(`font-style: ${style.italic ? "italic" : "normal"}`);
+  }
+  if (style.underline !== undefined) {
+    declarations.push(`text-decoration: ${style.underline ? "underline" : "none"}`);
+  }
   const styleAttribute = declarations.length > 0
     ? ` style="${escapeHtml(declarations.join("; "))}"`
     : "";
   return `<span${styleAttribute}>${escapeHtml(text)}</span>`;
+}
+
+function toHexColor(value: string, fallback: string): string {
+  const match = value.match(/rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
+  if (!match) return fallback;
+  return `#${[match[1], match[2], match[3]]
+    .map((part) => Number(part).toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+function currentSelectionStyle(range: Range): MarkdownLocalStyle {
+  const node = range.commonAncestorContainer;
+  const element = node instanceof Element ? node : node.parentElement;
+  if (!element) return {};
+  const style = getComputedStyle(element);
+  const weight = Number.parseInt(style.fontWeight, 10);
+  const family = style.fontFamily.toLocaleLowerCase();
+  return {
+    fontSize: style.fontSize,
+    fontFamily: family.includes("cascadia") || family.includes("consolas") || family.includes("mono")
+      ? "mono"
+      : family.includes("georgia") || family.includes("songti") || family.includes("serif")
+        ? "serif"
+        : "system",
+    color: toHexColor(style.color, "#20384e"),
+    backgroundColor: toHexColor(style.backgroundColor, "#fff0a8"),
+    bold: !Number.isNaN(weight) ? weight >= 600 : style.fontWeight === "bold",
+    italic: style.fontStyle === "italic" || style.fontStyle === "oblique",
+    underline:
+      style.textDecorationLine.includes("underline")
+      || style.textDecoration.includes("underline"),
+  };
 }
 
 export function MarkdownView({
@@ -178,7 +217,11 @@ export function MarkdownView({
 }: MarkdownViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectionRef = useRef<Range | null>(null);
-  const [selection, setSelection] = useState<{ rect: DOMRect; text: string } | null>(null);
+  const [selection, setSelection] = useState<{
+    rect: DOMRect;
+    text: string;
+    style: MarkdownLocalStyle;
+  } | null>(null);
   const rendered = useMemo(() => parseMarkdown(source), [source]);
   const sanitizedHtml = useMemo(() => sanitizeMarkdownHtml(rendered.html), [rendered.html]);
 
@@ -266,7 +309,11 @@ export function MarkdownView({
       return;
     }
     selectionRef.current = range.cloneRange();
-    setSelection({ rect: range.getBoundingClientRect(), text });
+    setSelection({
+      rect: range.getBoundingClientRect(),
+      text,
+      style: currentSelectionStyle(range),
+    });
   };
 
   const applyLocalStyle = (style: MarkdownLocalStyle) => {
@@ -278,7 +325,42 @@ export function MarkdownView({
       onLocalStyleError?.("当前选区不是唯一的纯文本片段，请只选择同一段落内的一段文字");
       return;
     }
-    const nextSource = `${source.slice(0, first)}${localStyleHtml(text, style)}${source.slice(first + text.length)}`;
+    let start = first;
+    let end = first + text.length;
+    const unwrap = (opening: string, closing: string) => {
+      if (
+        source.slice(0, start).endsWith(opening)
+        && source.slice(end).startsWith(closing)
+      ) {
+        start -= opening.length;
+        end += closing.length;
+      }
+    };
+
+    if (style.bold === false) {
+      unwrap("**", "**");
+      unwrap("__", "__");
+      unwrap("<strong>", "</strong>");
+      unwrap("<b>", "</b>");
+    }
+    if (style.italic === false) {
+      const before = source.slice(0, start);
+      const after = source.slice(end);
+      if (!before.endsWith("**") && before.endsWith("*") && after.startsWith("*") && !after.startsWith("**")) {
+        start -= 1;
+        end += 1;
+      } else if (!before.endsWith("__") && before.endsWith("_") && after.startsWith("_") && !after.startsWith("__")) {
+        start -= 1;
+        end += 1;
+      }
+      unwrap("<em>", "</em>");
+      unwrap("<i>", "</i>");
+    }
+    if (style.underline === false) {
+      unwrap("<u>", "</u>");
+    }
+
+    const nextSource = `${source.slice(0, start)}${localStyleHtml(text, style)}${source.slice(end)}`;
     onLocalStyleChange(nextSource);
     selectionRef.current = null;
     setSelection(null);
@@ -305,7 +387,9 @@ export function MarkdownView({
       </div>
       {selection && (
         <MarkdownSelectionToolbar
+          key={`${selection.text}:${selection.rect.left}:${selection.rect.top}`}
           rect={selection.rect}
+          initialStyle={selection.style}
           onApply={applyLocalStyle}
           onClose={() => {
             selectionRef.current = null;

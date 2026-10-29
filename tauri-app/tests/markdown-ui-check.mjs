@@ -65,6 +65,21 @@ try {
 
   await page.setViewportSize({ width: 1440, height: 900 });
 
+  const sidebar = page.locator(".sidebar-resizer");
+  const beforeSidebarWidth = await page.evaluate(() =>
+    getComputedStyle(document.querySelector(".workspace")).getPropertyValue("--sidebar-width"),
+  );
+  const resizerBox = await sidebar.boundingBox();
+  assert(resizerBox);
+  await page.mouse.move(resizerBox.x + 2, resizerBox.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(resizerBox.x + 82, resizerBox.y + 40);
+  await page.mouse.up();
+  const afterSidebarWidth = await page.evaluate(() =>
+    getComputedStyle(document.querySelector(".workspace")).getPropertyValue("--sidebar-width"),
+  );
+  assert.notEqual(afterSidebarWidth, beforeSidebarWidth);
+
   await page.screenshot({
     path: path.join(outputDir, "markdown-preview-1440x900.png"),
     fullPage: true,
@@ -72,6 +87,20 @@ try {
 
   await page.locator('[data-testid="tab-bar"] [role="tab"]', { hasText: "demo.xml" }).click();
   await page.getByText("表目录", { exact: true }).waitFor();
+  const xmlSidebar = page.locator(".sidebar-resizer");
+  const xmlBefore = await page.evaluate(() =>
+    getComputedStyle(document.querySelector(".workspace")).getPropertyValue("--sidebar-width"),
+  );
+  const xmlResizerBox = await xmlSidebar.boundingBox();
+  assert(xmlResizerBox);
+  await page.mouse.move(xmlResizerBox.x + 2, xmlResizerBox.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(xmlResizerBox.x + 60, xmlResizerBox.y + 40);
+  await page.mouse.up();
+  const xmlAfter = await page.evaluate(() =>
+    getComputedStyle(document.querySelector(".workspace")).getPropertyValue("--sidebar-width"),
+  );
+  assert.notEqual(xmlAfter, xmlBefore);
   await page.locator('[data-testid="tab-bar"] [role="tab"]', { hasText: "README.md" }).click();
   await page.locator('[data-testid="markdown-view"]').waitFor();
 
@@ -97,6 +126,10 @@ try {
   console.log(JSON.stringify({
     ok: true,
     layouts,
+    sidebarWidths: {
+      markdown: { before: beforeSidebarWidth, after: afterSidebarWidth },
+      xml: { before: xmlBefore, after: xmlAfter },
+    },
     tabs: await tabBar.innerText(),
     screenshots: [
       path.join(outputDir, "markdown-preview-1440x900.png"),
