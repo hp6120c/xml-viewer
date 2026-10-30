@@ -4,6 +4,10 @@ export interface SessionState {
   paths: string[];
   activePath: string | null;
   zoom: number;
+  sidebarWidths?: {
+    xml: number;
+    markdown: number;
+  };
 }
 
 export function loadSession(): SessionState | null {
@@ -19,6 +23,14 @@ export function loadSession(): SessionState | null {
       zoom: typeof parsed.zoom === "number" && Number.isFinite(parsed.zoom)
         ? Math.min(140, Math.max(80, parsed.zoom))
         : 100,
+      sidebarWidths: parsed.sidebarWidths
+        && typeof parsed.sidebarWidths.xml === "number"
+        && typeof parsed.sidebarWidths.markdown === "number"
+        ? {
+          xml: Math.min(520, Math.max(200, parsed.sidebarWidths.xml)),
+          markdown: Math.min(520, Math.max(200, parsed.sidebarWidths.markdown)),
+        }
+        : undefined,
     };
   } catch {
     return null;

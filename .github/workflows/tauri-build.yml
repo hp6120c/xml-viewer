@@ -141,8 +141,21 @@ jobs:
         with:
           projectPath: tauri-app
           tagName: ${{ steps.meta.outputs.tag }}
-          releaseName: XML 数据库设计查看器 ${{ steps.meta.outputs.tag }}
+          releaseName: XML / Markdown 编辑器 ${{ steps.meta.outputs.tag }}
           releaseBody: |
+            ## XML / Markdown 编辑器 V2.1.0
+
+            - 新增 Markdown 文档预览、源码编辑、GFM 表格、任务列表、脚注和代码高亮
+            - 支持 Markdown 与 XML 混合标签页、文件夹打开和单实例文件转交
+            - Markdown 预览支持选中文字后局部调整字号、字体、颜色、高亮、粗体、斜体、下划线
+            - 支持 Markdown 左侧大纲字体、字号、字重设置
+            - XML 和 Markdown 左侧导航栏支持拖拽调整宽度并分别记忆
+            - 新增新建 Markdown / XML 文件功能
+            - 新增全屏模式，隐藏顶部菜单，保留标签栏和内容
+            - 新增 Markdown 相对图片安全加载、外部修改冲突保护和原文编码/BOM/换行保留
+            - 注册 Windows `.xml`、`.md`、`.markdown` 默认应用候选
+            - 检查更新时先显示版本说明，再提供“取消 / 立即更新”
+
             Windows NSIS 安装包。自动更新清单为 `latest.json`，更新包使用 Tauri updater 签名。
           releaseCommitish: ${{ github.sha }}
           releaseDraft: false

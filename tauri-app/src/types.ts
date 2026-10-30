@@ -95,6 +95,18 @@ export interface XmlDocument {
   rawSource: string | null;
 }
 
+export interface MarkdownDocument {
+  path: string;
+  fileName: string;
+  fileSize: number;
+  encoding: string;
+  kind: "markdown";
+  source: string;
+  contentHash: string;
+}
+
+export type OpenedDocument = XmlDocument | MarkdownDocument;
+
 export interface TableSource {
   tableIndex: number;
   tableId: string;

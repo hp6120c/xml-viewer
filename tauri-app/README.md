@@ -1,8 +1,8 @@
-# XML 数据库设计查看器（Tauri 2）
+# XML / Markdown 编辑器（Tauri 2）
 
-这是 XML 数据库设计查看器的 **V2.x 桌面版**。当前项目已从旧版 Python/PyQt5 架构迁移到 **Tauri 2 + React + TypeScript + Rust**，XML 预览和表格由 Windows WebView2 中的 Chromium 内核渲染，不再受 `QTextBrowser` 的排版能力限制。
+这是 XML 数据库设计编辑器和 Markdown 编辑器的 **V2.x 桌面版**。当前项目已从旧版 Python/PyQt5 架构迁移到 **Tauri 2 + React + TypeScript + Rust**，XML 表格和 Markdown 文档由 Windows WebView2 中的 Chromium 内核渲染，不再受 `QTextBrowser` 的排版能力限制。
 
-> 软件定位是查看和轻量编辑 SCL Schema XML，不是通用 XML 格式化器。界面会自动识别数据库、模块、子模块、表、字段、主键、外键、索引和备注等结构。
+> 软件支持查看和轻量编辑 SCL Schema XML，也支持 CommonMark/GFM Markdown 的阅读和源码编辑。界面会自动识别 XML 数据库结构、模块、表、字段，并为 Markdown 提供大纲、预览和编辑模式。
 
 ## 技术架构
 
@@ -11,15 +11,15 @@
 | 桌面壳 | Tauri 2 | 窗口、单实例、文件关联、命令行参数、系统设置入口 |
 | 前端 | React 18 + TypeScript + Vite | 标签页、模块树、表详情、搜索、编辑器、响应式布局 |
 | 渲染 | Windows WebView2 | 使用 Chromium 渲染 HTML/CSS，支持流式宽度和复杂表格 |
-| 后端 | Rust | XML 编解码、解析、校验、原子保存、目录扫描 |
-| 编辑器 | CodeMirror 6 | XML 语法高亮、搜索和直接编辑 |
-| 打包 | Tauri NSIS | 生成 Windows 当前用户安装包并注册 `.xml` 文件关联 |
+| 后端 | Rust | XML / Markdown 编解码、解析、校验、原子保存、目录扫描 |
+| 编辑器 | CodeMirror 6 | XML / Markdown 语法高亮、搜索和直接编辑 |
+| 打包 | Tauri NSIS | 生成 Windows 当前用户安装包并注册 `.xml` / `.md` / `.markdown` 文件关联 |
 | 更新 | Tauri Updater v2 | 校验签名并通过 GitHub Release 的 `latest.json` 发布更新 |
 
 核心数据流如下：
 
-1. Tauri 启动时读取命令行中的 `.xml` 路径；
-2. Rust 按 BOM 或 XML 声明识别编码，解析出数据库结构；
+1. Tauri 启动时读取命令行中的 `.xml` / `.md` / `.markdown` 路径；
+2. XML 按数据库结构解析；Markdown 读取为文本并交给前端渲染；
 3. React 在 WebView2 中渲染模块树、总览和字段详情；
 4. 编辑时前端把修改后的单表 XML 片段发送给 Rust；
 5. Rust 先做完整 XML 校验，再通过同目录临时文件原子替换原文件；
@@ -39,6 +39,12 @@
 - 窗口尺寸自适应，表格宽度跟随内容区并支持必要时的水平滚动；
 - 界面缩放；
 - Windows `.xml` 文件关联、双击打开和单实例文件转交。
+- Markdown 标题大纲、GFM 表格、任务列表、脚注、代码高亮和 Front Matter；
+- Markdown 预览 / 编辑切换、保存、相对链接与受限相对图片加载；
+- Markdown 预览选区局部样式：字号、字体、文字颜色、背景高亮、粗体、斜体、下划线；
+- 新建 Markdown / XML 文件、全屏模式（F11 / Esc 退出）和 Markdown 基础阅读样式；
+- Markdown 基础样式可单独调整左侧大纲字体、字号和字重；
+- Windows `.md` / `.markdown` 文件关联和混合文件标签页。
 
 ## 目录结构
 
@@ -193,6 +199,8 @@ Windows 不允许普通桌面程序静默把自己设为默认应用。Tauri 的
 - 让程序出现在“打开方式”和 Windows“默认应用”候选列表中；
 - 安装后允许用户通过双击、右键“打开方式”或系统设置选择本程序。
 
+程序启动时会额外注册当前用户的 `RegisteredApplications` 和 `Capabilities`，所以 `.xml`、`.md`、`.markdown` 都能在 Windows 默认应用选择器中出现。点击“默认应用设置”也会先刷新这些注册项。
+
 它**不能绕过 Windows 的默认应用确认机制**，也不应该尝试直接修改系统默认关联来冒充用户确认。这是 Windows 平台的安全和用户体验约束，和 Tauri、Electron 或 Qt 无关。
 
 ### 设置步骤
@@ -208,8 +216,8 @@ ms-settings:defaultapps
 1. 打开“设置 → 应用 → 默认应用”；
 2. 选择“按文件类型选择默认应用”；
 3. 找到 `.xml`；
-4. 选择“XML 数据库设计查看器”；
-5. 也可以右键任意 XML 文件，选择“打开方式 → 选择其他应用”，勾选“始终使用此应用打开 .xml 文件”。
+4. 选择“XML / Markdown 编辑器”；
+5. 也可以右键任意 XML / Markdown 文件，选择“打开方式 → 选择其他应用”，勾选“始终使用此应用打开”；
 
 Windows 11 不同版本的默认应用页面布局可能略有差异，但都必须在系统 UI 中由用户确认。安装包注册文件关联不代表它已经成为默认应用。
 
@@ -233,7 +241,7 @@ Tauri 安装包会在 `tauri.conf.json` 中注册：
 用户将本程序设为 `.xml` 默认应用后，双击文件即可打开。程序也支持命令行一次传入一个或多个 XML：
 
 ```powershell
-& "<安装目录>\XML数据库设计查看器.exe" "C:\data\design-a.xml" "D:\specs\design-b.xml"
+& "<安装目录>\xml-database-viewer.exe" "C:\data\design-a.xml" "D:\specs\design-b.xml"
 ```
 
 路径包含空格时必须使用双引号。后端只接受实际存在且扩展名为 `.xml` 的文件路径，其他命令行参数会被忽略。

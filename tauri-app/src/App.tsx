@@ -8,19 +8,23 @@ import {
   useState,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 
 import {
   AlertCircle,
   CheckCircle2,
   Download,
+  FileText,
   FilePlus2,
   FolderOpen,
   Github,
   HelpCircle,
   Link2,
   LoaderCircle,
+  Maximize2,
   Minus,
+  Minimize2,
   PencilLine,
   Plus,
   RefreshCw,
@@ -28,6 +32,7 @@ import {
   Save,
   Search,
   Settings2,
+  SlidersHorizontal,
   Table2,
   X,
 } from "lucide-react";
@@ -43,33 +48,72 @@ import { XmlEditor } from "./components/XmlEditor";
 
 import { GenericXmlView } from "./components/GenericXmlView";
 
+import { MarkdownEditor } from "./components/MarkdownEditor";
+
+import { MarkdownOutline } from "./components/MarkdownOutline";
+
+import { MarkdownSettingsPanel } from "./components/MarkdownSettingsPanel";
+
+import { MarkdownView } from "./components/MarkdownView";
+
 import {
   chooseFolder,
-  chooseXmlFiles,
+  chooseDocuments,
   demoDocument,
   getAppInfo,
+  getFullscreenState,
   getLaunchPaths,
   getTableSource,
   isDesktopApp,
   listenForOpenFiles,
-  loadXmlFile,
+  loadDocument,
   openDefaultAppsSettings,
   openExternalUrl,
+  saveMarkdownFile,
   saveTableSource,
-  scanXmlFiles,
+  setFullscreen,
+  scanDocuments,
+  chooseNewDocument,
+  createDocument,
 } from "./lib/api";
 
-import { columnCount, filterModules, formatBytes, moduleCount, tableCount } from "./lib/xml";
+import {
+  columnCount,
+  filterModules,
+  formatBytes,
+  moduleCount,
+  tableCount,
+} from "./lib/xml";
 
 import { loadSession, saveSession } from "./lib/session";
 import { checkForUpdate, installUpdate } from "./lib/updater";
-import type { TableInfo, XmlDocument } from "./types";
+import type { UpdateDetails } from "./lib/updater";
+import { extractMarkdownHeadings, markdownStats } from "./lib/markdown";
+import {
+  loadMarkdownSettings,
+  saveMarkdownSettings,
+} from "./lib/markdown-settings";
+import type { OpenedDocument, TableInfo } from "./types";
 
-type ViewMode = "overview" | "detail" | "edit";
+type ViewMode = "overview" | "detail" | "edit" | "markdown-read" | "markdown-edit";
 type ToastState = { kind: "success" | "error" | "info"; message: string } | null;
 type TabMenuState = { x: number; y: number; path: string } | null;
 
-async function confirmUpdate(message: string): Promise<boolean> {
+function updateNotes(update: UpdateDetails): string {
+  const notes = update.body.trim();
+  return notes || "该版本未提供详细更新说明。";
+}
+
+async function confirmUpdate(update: UpdateDetails): Promise<boolean> {
+  const message = [
+    `发现新版本 V${update.version}（当前 V${update.currentVersion}）`,
+    update.date ? `发布时间：${update.date}` : "",
+    "",
+    "更新内容：",
+    updateNotes(update),
+    "",
+    "是否立即下载并安装？",
+  ].filter((line, index, lines) => line !== "" || lines[index - 1] !== "").join("\n");
   if (isDesktopApp()) {
     const dialog = await import("@tauri-apps/plugin-dialog");
     return dialog.confirm(message, {
@@ -97,8 +141,8 @@ async function askDiscard(message: string): Promise<boolean> {
 
 function App() {
   const initialSession = useRef(loadSession());
-  const [version, setVersion] = useState("2.0.0");
-  const [documents, setDocuments] = useState<XmlDocument[]>([]);
+  const [version, setVersion] = useState("2.1.0");
+  const [documents, setDocuments] = useState<OpenedDocument[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
   const [selectedTableIndex, setSelectedTableIndex] = useState<number | null>(null);
   const [mode, setMode] = useState<ViewMode>("overview");
@@ -114,6 +158,13 @@ function App() {
   const [dragActive, setDragActive] = useState(false);
   const [tabMenu, setTabMenu] = useState<TabMenuState>(null);
   const [sessionReady, setSessionReady] = useState(false);
+  const [newFileMenuOpen, setNewFileMenuOpen] = useState(false);
+  const [markdownSettings, setMarkdownSettings] = useState(loadMarkdownSettings);
+  const [markdownSettingsOpen, setMarkdownSettingsOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [sidebarWidths, setSidebarWidths] = useState(
+    () => initialSession.current?.sidebarWidths ?? { xml: 278, markdown: 260 },
+  );
 
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
@@ -128,13 +179,14 @@ function App() {
   const pendingOpenPathsRef = useRef<string[]>([]);
   const updateCheckingRef = useRef(false);
   const autoUpdateCheckedRef = useRef(false);
+  const resizingSidebarRef = useRef(false);
 
   const activeDocument = useMemo(
     () => documents.find((document) => document.path === activePath) ?? null,
     [documents, activePath],
   );
   const activeTables = useMemo(() => {
-    if (!activeDocument) return [];
+    if (!activeDocument || activeDocument.kind === "markdown") return [];
     return activeDocument.modules.flatMap((module) => [
       ...module.tables,
       ...module.submodules.flatMap((submodule) => submodule.tables),
@@ -145,20 +197,77 @@ function App() {
     [activeTables, selectedTableIndex],
   );
   const filteredModules = useMemo(
-    () => (activeDocument ? filterModules(activeDocument.modules, search) : []),
+    () => (activeDocument && activeDocument.kind !== "markdown"
+      ? filterModules(activeDocument.modules, search)
+      : []),
     [activeDocument, search],
+  );
+  const markdownHeadings = useMemo(
+    () => (activeDocument?.kind === "markdown" ? extractMarkdownHeadings(activeDocument.source) : []),
+    [activeDocument],
+  );
+  const activeMarkdownStats = useMemo(
+    () => (activeDocument?.kind === "markdown" ? markdownStats(activeDocument.source) : null),
+    [activeDocument],
   );
   const totals = useMemo(
     () => documents.reduce(
-      (result, document) => ({
-        modules: result.modules + moduleCount(document),
-        tables: result.tables + tableCount(document),
-        columns: result.columns + columnCount(document),
-      }),
+      (result, document) => {
+        if (document.kind === "markdown") return result;
+        return {
+          modules: result.modules + moduleCount(document),
+          tables: result.tables + tableCount(document),
+          columns: result.columns + columnCount(document),
+        };
+      },
       { modules: 0, tables: 0, columns: 0 },
     ),
     [documents],
   );
+
+  useEffect(() => {
+    if (!isDesktopApp()) return;
+    void getFullscreenState().then(setIsFullscreen).catch(() => undefined);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    const next = !isFullscreen;
+    try {
+      await setFullscreen(next);
+      setIsFullscreen(next);
+    } catch (error) {
+      setToast({ kind: "error", message: `切换全屏失败：${String(error)}` });
+    }
+  }, [isFullscreen]);
+
+  const sidebarWidth = activeDocument?.kind === "markdown"
+    ? sidebarWidths.markdown
+    : sidebarWidths.xml;
+
+  const startSidebarResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    resizingSidebarRef.current = true;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, []);
+
+  const moveSidebarResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!resizingSidebarRef.current) return;
+    const workspace = event.currentTarget.parentElement;
+    if (!workspace) return;
+    const rect = workspace.getBoundingClientRect();
+    const scale = zoom / 100;
+    const next = Math.min(520, Math.max(200, (event.clientX - rect.left) / scale));
+    const key = activeDocument?.kind === "markdown" ? "markdown" : "xml";
+    setSidebarWidths((current) => ({ ...current, [key]: next }));
+  }, [activeDocument, zoom]);
+
+  const stopSidebarResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!resizingSidebarRef.current) return;
+    resizingSidebarRef.current = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -167,17 +276,28 @@ function App() {
   }, [toast]);
 
   useEffect(() => {
+    saveMarkdownSettings(markdownSettings);
+  }, [markdownSettings]);
+
+  useEffect(() => {
+    if (activeDocument?.kind !== "markdown" || mode === "markdown-edit") {
+      setMarkdownSettingsOpen(false);
+    }
+  }, [activeDocument, mode]);
+
+  useEffect(() => {
     if (!sessionReady) return;
     saveSession({
       paths: documents.map((document) => document.path).filter((path) => !path.startsWith("demo:")),
       activePath: activePath?.startsWith("demo:") ? null : activePath,
       zoom,
+      sidebarWidths,
     });
-  }, [documents, activePath, zoom, sessionReady]);
+  }, [activePath, documents, sessionReady, sidebarWidths, zoom]);
 
-  const resetWorkspaceView = useCallback(() => {
+  const resetWorkspaceView = useCallback((markdown = false) => {
     editRequestRef.current += 1;
-    setMode("overview");
+    setMode(markdown ? "markdown-read" : "overview");
     setSelectedTableIndex(null);
     setEditingTableIndex(null);
     setEditingTableId(null);
@@ -186,7 +306,7 @@ function App() {
     setDirty(false);
   }, []);
 
-  const replaceDocument = useCallback((nextDocument: XmlDocument) => {
+  const replaceDocument = useCallback((nextDocument: OpenedDocument) => {
     setDocuments((current) =>
       current.map((document) => (document.path === nextDocument.path ? nextDocument : document)),
     );
@@ -198,12 +318,12 @@ function App() {
     const requestId = ++loadRequestRef.current;
 
     if (dirtyRef.current) {
-      const discard = await askDiscard("打开其他文件会放弃当前表尚未保存的修改，是否继续？");
+      const discard = await askDiscard("打开其他文件会放弃当前文档尚未保存的修改，是否继续？");
       if (!discard) return false;
     }
 
     setBusy(`正在读取 ${unique.length} 个文件...`);
-    const loaded: XmlDocument[] = [];
+    const loaded: OpenedDocument[] = [];
     const errors: string[] = [];
     for (let index = 0; index < unique.length; index += 1) {
       if (requestId !== loadRequestRef.current) return false;
@@ -215,7 +335,7 @@ function App() {
       }
       setBusy(`正在读取 ${index + 1}/${unique.length}：${path.split(/[\\/]/).pop() ?? path}`);
       try {
-        loaded.push(await loadXmlFile(path));
+        loaded.push(await loadDocument(path));
       } catch (error) {
         errors.push(String(error));
       }
@@ -232,7 +352,7 @@ function App() {
       const destination = loaded.find((document) => document.path === preferredPath) ?? loaded[0];
       setActivePath(destination.path);
       setSearch("");
-      resetWorkspaceView();
+      resetWorkspaceView(destination.kind === "markdown");
     }
 
     if (errors.length > 0) {
@@ -311,7 +431,7 @@ function App() {
                 const expanded: string[] = [];
                 for (const path of droppedPaths) {
                   try {
-                    expanded.push(...await scanXmlFiles(path));
+                    expanded.push(...await scanDocuments(path));
                   } catch {
                     expanded.push(path);
                   }
@@ -330,7 +450,7 @@ function App() {
           const unlisten = await windowApi.getCurrentWindow().onCloseRequested(async (event) => {
             if (!dirtyRef.current) return;
             event.preventDefault();
-            const discard = await askDiscard("当前表有未保存的修改，确定关闭程序并放弃修改吗？");
+            const discard = await askDiscard("当前文档有未保存的修改，确定关闭程序并放弃修改吗？");
             if (discard) {
               dirtyRef.current = false;
               await windowApi.getCurrentWindow().destroy();
@@ -360,7 +480,7 @@ function App() {
   }, []);
 
   const enterEdit = useCallback(async (table: TableInfo) => {
-    if (!activeDocument) return;
+    if (!activeDocument || activeDocument.kind !== "scl") return;
     if (mode === "edit" && table.nodeIndex === editingTableIndex) return;
 
     if (mode === "edit" && dirtyRef.current) {
@@ -391,7 +511,9 @@ function App() {
   }, [activeDocument, dirty, editingTableIndex, mode]);
 
   const saveEdit = useCallback(async (exitAfterSave: boolean): Promise<boolean> => {
-    if (!activeDocument || editingTableIndex === null || !editingTableId) return false;
+    if (!activeDocument || activeDocument.kind !== "scl" || editingTableIndex === null || !editingTableId) {
+      return false;
+    }
     if (!dirty) {
       if (exitAfterSave) setMode("detail");
       return true;
@@ -436,15 +558,83 @@ function App() {
     }
   }, [activeDocument, dirty, editingTableId, editingTableIndex, editorContent, replaceDocument]);
 
+  const enterMarkdownEdit = useCallback(async () => {
+    if (!activeDocument || activeDocument.kind !== "markdown") return;
+    if (mode === "markdown-edit") return;
+    const preservePreviewStyles = mode === "markdown-read" && dirtyRef.current;
+    if (dirtyRef.current && !preservePreviewStyles) {
+      const discard = await askDiscard("进入 Markdown 编辑会放弃当前尚未保存的修改，是否继续？");
+      if (!discard) return;
+    }
+    setEditorContent(activeDocument.source.replace(/\r\n/g, "\n"));
+    setEditorEncoding(activeDocument.encoding);
+    if (!preservePreviewStyles) {
+      editorRevisionRef.current = 0;
+      setDirty(false);
+    }
+    setMode("markdown-edit");
+  }, [activeDocument, mode]);
+
+  const saveMarkdownEdit = useCallback(async (exitAfterSave: boolean): Promise<boolean> => {
+    if (!activeDocument || activeDocument.kind !== "markdown") return false;
+    if (!dirty) {
+      if (exitAfterSave) setMode("markdown-read");
+      return true;
+    }
+    const sessionId = editRequestRef.current;
+    const savedRevision = editorRevisionRef.current;
+    setBusy("正在保存 Markdown 文档...");
+    try {
+      const nextDocument = await saveMarkdownFile(
+        activeDocument.path,
+        editorContent,
+        activeDocument.contentHash,
+      );
+      replaceDocument(nextDocument);
+      if (sessionId !== editRequestRef.current) return true;
+      if (editorRevisionRef.current !== savedRevision) {
+        setDirty(true);
+        setToast({ kind: "error", message: "保存期间内容又发生了变化，磁盘已保存到上一次快照，请再次保存" });
+        return false;
+      }
+      setDirty(false);
+      setToast({ kind: "success", message: "Markdown 文档已保存" });
+      if (exitAfterSave) setMode("markdown-read");
+      return true;
+    } catch (error) {
+      if (sessionId === editRequestRef.current) {
+        setToast({ kind: "error", message: String(error) });
+      }
+      return false;
+    } finally {
+      if (sessionId === editRequestRef.current) setBusy(null);
+    }
+  }, [activeDocument, dirty, editorContent, replaceDocument]);
+
+  const applyMarkdownLocalStyle = useCallback((nextSource: string) => {
+    if (!activeDocument || activeDocument.kind !== "markdown") return;
+    setEditorContent(nextSource);
+    editorRevisionRef.current += 1;
+    setDirty(true);
+    setDocuments((current) => current.map((document) =>
+      document.path === activeDocument.path && document.kind === "markdown"
+        ? { ...document, source: nextSource }
+        : document,
+    ));
+    setToast({ kind: "info", message: "局部样式已应用，按 Ctrl+S 或点击“保存更改”写入 Markdown" });
+  }, [activeDocument]);
+
   const cancelEdit = useCallback(async () => {
     if (dirty) {
-      const discard = await askDiscard("确定放弃当前表的修改吗？");
+      const discard = await askDiscard(
+        activeDocument?.kind === "markdown" ? "确定放弃当前 Markdown 文档的修改吗？" : "确定放弃当前表的修改吗？",
+      );
       if (!discard) return;
     }
     editRequestRef.current += 1;
     setDirty(false);
-    setMode(activeTable ? "detail" : "overview");
-  }, [activeTable, dirty]);
+    setMode(activeDocument?.kind === "markdown" ? "markdown-read" : (activeTable ? "detail" : "overview"));
+  }, [activeDocument, activeTable, dirty]);
 
   const selectTable = useCallback(async (table: TableInfo) => {
     if (mode === "edit") {
@@ -463,7 +653,8 @@ function App() {
       setDirty(false);
     }
     setActivePath(path);
-    resetWorkspaceView();
+    const next = documentsRef.current.find((document) => document.path === path);
+    resetWorkspaceView(next?.kind === "markdown");
   }, [activePath, dirty, resetWorkspaceView]);
 
   const closePaths = useCallback(async (pathsToClose: string[]) => {
@@ -477,20 +668,43 @@ function App() {
     const currentPaths = documentsRef.current.map((document) => document.path);
     const remaining = currentPaths.filter((path) => !unique.has(path));
     const oldActiveIndex = activePath ? currentPaths.indexOf(activePath) : -1;
+    const remainingDocuments = documentsRef.current.filter((document) => !unique.has(document.path));
     setDocuments((current) => current.filter((document) => !unique.has(document.path)));
     if (activePath && unique.has(activePath)) {
       const nextPath = remaining[Math.min(Math.max(oldActiveIndex, 0), Math.max(remaining.length - 1, 0))] ?? null;
       setActivePath(nextPath);
-      resetWorkspaceView();
+      const next = remainingDocuments.find((document) => document.path === nextPath);
+      resetWorkspaceView(next?.kind === "markdown");
     }
     setTabMenu(null);
   }, [activePath, dirty, resetWorkspaceView]);
 
   const openFiles = useCallback(async () => {
     try {
-      const paths = await chooseXmlFiles();
+      const paths = await chooseDocuments();
       await loadPaths(paths);
     } catch (error) {
+      setToast({ kind: "error", message: String(error) });
+    }
+  }, [loadPaths]);
+
+  const createNewDocument = useCallback(async (kind: "markdown" | "xml") => {
+    try {
+      setNewFileMenuOpen(false);
+      const path = await chooseNewDocument(kind);
+      if (!path) return;
+      setBusy("正在创建文件...");
+      await createDocument(path, kind);
+      const loaded = await loadPaths([path]);
+      setBusy(null);
+      if (loaded) {
+        setToast({
+          kind: "success",
+          message: kind === "markdown" ? "已新建 Markdown 文档" : "已新建 XML 文档",
+        });
+      }
+    } catch (error) {
+      setBusy(null);
       setToast({ kind: "error", message: String(error) });
     }
   }, [loadPaths]);
@@ -499,11 +713,11 @@ function App() {
     try {
       const folder = await chooseFolder();
       if (!folder) return;
-      setBusy("正在扫描 XML 文件...");
-      const paths = await scanXmlFiles(folder);
+      setBusy("正在扫描 XML / Markdown 文件...");
+      const paths = await scanDocuments(folder);
       setBusy(null);
       if (paths.length === 0) {
-        setToast({ kind: "info", message: "所选目录中没有找到 XML 文件" });
+        setToast({ kind: "info", message: "所选目录中没有找到 XML 或 Markdown 文件" });
         return;
       }
       await loadPaths(paths);
@@ -527,10 +741,16 @@ function App() {
         if (!silent) setToast({ kind: "success", message: "当前已是最新版本" });
         return;
       }
-      const confirmed = await confirmUpdate(
-        `发现新版本 V${update.version}（当前 V${update.currentVersion}）${update.date ? `\n发布时间：${update.date}` : ""}\n\n是否立即下载并安装？`,
-      );
+      const confirmed = await confirmUpdate(update);
       if (!confirmed) return;
+      if (dirtyRef.current) {
+        const discard = await askDiscard(
+          "安装更新会关闭程序并放弃当前未保存的修改，是否继续？",
+        );
+        if (!discard) return;
+        dirtyRef.current = false;
+        setDirty(false);
+      }
       setBusy(`正在下载 V${update.version}...`);
       await installUpdate(update.raw, (event) => {
         if (event.event === "Started") setBusy(`正在下载 V${update.version}...`);
@@ -557,9 +777,11 @@ function App() {
     }
     setBusy("正在重新读取文件...");
     try {
-      const nextDocument = await loadXmlFile(activeDocument.path);
+      const nextDocument = await loadDocument(activeDocument.path);
       replaceDocument(nextDocument);
-      if (selectedTableIndex !== null) {
+      if (nextDocument.kind === "markdown") {
+        if (mode === "markdown-edit") setMode("markdown-read");
+      } else if (selectedTableIndex !== null) {
         const exists = nextDocument.modules.some((module) =>
           module.tables.some((table) => table.nodeIndex === selectedTableIndex)
           || module.submodules.some((submodule) => submodule.tables.some((table) => table.nodeIndex === selectedTableIndex)),
@@ -577,20 +799,48 @@ function App() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "F11" || (event.key === "Escape" && isFullscreen)) {
+        event.preventDefault();
+        void toggleFullscreen();
+        return;
+      }
       if (!(event.ctrlKey || event.metaKey)) return;
+      if (event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        void createNewDocument("markdown");
+        return;
+      }
       if (event.key.toLowerCase() === "s") {
         event.preventDefault();
-        void saveEdit(false);
+        if (activeDocument?.kind === "markdown") void saveMarkdownEdit(false);
+        else void saveEdit(false);
       }
       if (event.key.toLowerCase() === "e") {
         event.preventDefault();
-        if (mode === "edit") void saveEdit(true);
-        else if (activeTable) void enterEdit(activeTable);
+        if (activeDocument?.kind === "markdown") {
+          if (mode === "markdown-edit") void saveMarkdownEdit(true);
+          else void enterMarkdownEdit();
+        } else if (mode === "edit") {
+          void saveEdit(true);
+        } else if (activeTable) {
+          void enterEdit(activeTable);
+        }
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeTable, enterEdit, mode, saveEdit]);
+  }, [
+    activeDocument,
+    activeTable,
+    createNewDocument,
+    enterEdit,
+    enterMarkdownEdit,
+    isFullscreen,
+    mode,
+    saveEdit,
+    saveMarkdownEdit,
+    toggleFullscreen,
+  ]);
 
   const handleTabContextMenu = (event: ReactMouseEvent, path: string) => {
     event.preventDefault();
@@ -605,13 +855,23 @@ function App() {
   const contextIndex = tabMenu ? documents.findIndex((document) => document.path === tabMenu.path) : -1;
 
   return (
-    <div className="app" style={{ "--app-zoom": zoom / 100 } as CSSProperties} data-testid="app">
+    <div
+      className={`app ${isFullscreen ? "fullscreen-mode" : ""}`}
+      style={{ "--app-zoom": zoom / 100 } as CSSProperties}
+      data-testid="app"
+    >
       <header className="app-header">
         <div className="brand">
           <div className="brand-mark"><Table2 size={22} /></div>
           <div>
-            <h1>数据库设计查看器</h1>
-            <span>SCL Schema XML · Tauri 2</span>
+            <h1>XML / Markdown 编辑器</h1>
+            <span>
+              {activeDocument?.kind === "markdown"
+                ? "Markdown 文档 · Tauri 2"
+                : activeDocument?.kind === "xml"
+                  ? "通用 XML 文档 · Tauri 2"
+                  : "SCL Schema XML · Tauri 2"}
+            </span>
           </div>
         </div>
         <div className="header-actions">
@@ -630,23 +890,61 @@ function App() {
         <button type="button" className="tool-button" onClick={openFolder}>
           <FolderOpen size={17} />打开文件夹
         </button>
+        <div className="new-file-menu">
+          <button
+            type="button"
+            className="tool-button"
+            onClick={() => setNewFileMenuOpen((value) => !value)}
+          >
+            <FilePlus2 size={17} />新建文件
+          </button>
+          {newFileMenuOpen && (
+            <div className="new-file-menu-popup" role="menu">
+              <button type="button" role="menuitem" onClick={() => void createNewDocument("markdown")}>
+                <FileText size={15} />新建 Markdown 文档
+              </button>
+              <button type="button" role="menuitem" onClick={() => void createNewDocument("xml")}>
+                <Table2 size={15} />新建 XML 文档
+              </button>
+            </div>
+          )}
+        </div>
         <button type="button" className="tool-button" onClick={openFiles}>
           <FilePlus2 size={17} />打开文件
         </button>
-        <button type="button" className="tool-button" onClick={reloadCurrent} disabled={!activeDocument || mode === "edit"}>
+        <button type="button" className="tool-button" onClick={reloadCurrent} disabled={!activeDocument || mode === "edit" || mode === "markdown-edit"}>
           <RefreshCw size={17} />刷新
         </button>
         <button
           type="button"
-          className={`tool-button ${mode === "edit" ? "active" : ""}`}
+          className={`tool-button ${mode === "edit" || mode === "markdown-edit" ? "active" : ""}`}
           onClick={() => {
-            if (mode === "edit") void saveEdit(true);
-            else if (activeTable) void enterEdit(activeTable);
-            else setToast({ kind: "info", message: "请先在左侧或目录中选择一张表" });
+            if (activeDocument?.kind === "markdown") {
+              if (mode === "markdown-edit") void saveMarkdownEdit(true);
+              else if (dirtyRef.current) void saveMarkdownEdit(false);
+              else void enterMarkdownEdit();
+            } else if (mode === "edit") {
+              void saveEdit(true);
+            } else if (activeTable) {
+              void enterEdit(activeTable);
+            } else {
+              setToast({ kind: "info", message: "请先在左侧或目录中选择一张表" });
+            }
           }}
-          disabled={!activeDocument || activeDocument.kind === "xml" || (mode !== "edit" && !activeTable)}
+          disabled={
+            !activeDocument
+            || activeDocument.kind === "xml"
+            || (activeDocument.kind === "scl" && mode !== "edit" && !activeTable)
+          }
         >
-          <PencilLine size={17} />{mode === "edit" ? "保存并阅读" : "编辑模式"}
+          {activeDocument?.kind === "markdown"
+            ? <FileText size={17} />
+            : <PencilLine size={17} />}
+          {mode === "edit" || mode === "markdown-edit"
+            ? "保存并阅读"
+            : activeDocument?.kind === "markdown" && dirty
+              ? "保存更改"
+              : "编辑模式"}
         </button>
 
         <label className="search-box">
@@ -654,7 +952,11 @@ function App() {
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="搜索表名、字段名或备注..."
+            placeholder={
+              activeDocument?.kind === "markdown"
+                ? "搜索文档标题..."
+                : "搜索表名、字段名或备注..."
+            }
             aria-label="搜索表名、字段名或备注"
             disabled={activeDocument?.kind === "xml"}
           />
@@ -665,6 +967,18 @@ function App() {
           )}
         </label>
 
+        {activeDocument?.kind === "markdown" && (
+          <button
+            type="button"
+            className="tool-button"
+            onClick={() => setMarkdownSettingsOpen(true)}
+            disabled={mode === "markdown-edit"}
+            title={mode === "markdown-edit" ? "切回阅读模式后调整预览样式" : "调整 Markdown 阅读样式"}
+          >
+            <SlidersHorizontal size={17} />基础样式
+          </button>
+        )}
+
         <div className="toolbar-spacer" />
 
         <div className="zoom-control" title="界面缩放">
@@ -673,6 +987,16 @@ function App() {
           <button type="button" aria-label="放大界面" title="放大界面" disabled={zoom >= 140} onClick={() => setZoom((value) => Math.min(140, value + 10))}><Plus size={14} /></button>
           <button type="button" onClick={() => setZoom(100)} aria-label="恢复默认缩放" title="恢复默认缩放"><RotateCcw size={13} /></button>
         </div>
+
+        <button
+          type="button"
+          className="tool-button"
+          onClick={() => void toggleFullscreen()}
+          title={isFullscreen ? "退出全屏（F11）" : "全屏（F11）"}
+        >
+          {isFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+          {isFullscreen ? "退出全屏" : "全屏"}
+        </button>
 
         <button type="button" className="tool-button" onClick={() => void handleCheckUpdate(false)}>
           <Download size={17} />检查更新
@@ -684,22 +1008,34 @@ function App() {
           onClick={async () => {
             try {
               await openDefaultAppsSettings();
-              setToast({ kind: "info", message: "已打开 Windows 默认应用设置，请选择本程序作为 XML 默认应用" });
+              setToast({ kind: "info", message: "已打开 Windows 默认应用设置，请按文件类型选择本程序" });
             } catch (error) {
               setToast({ kind: "error", message: String(error) });
             }
           }}
         >
-          <Settings2 size={17} />设为默认
+          <Settings2 size={17} />默认应用设置
         </button>
       </div>
 
       <div className="stats-bar">
-        <span>模块 <strong>{totals.modules}</strong></span>
-        <span>表 <strong>{totals.tables}</strong></span>
-        <span>字段 <strong>{totals.columns}</strong></span>
+        {activeDocument?.kind === "markdown" ? (
+          <>
+            <span>标题 <strong>{activeMarkdownStats?.headingCount ?? 0}</strong></span>
+            <span>字数 <strong>{activeMarkdownStats?.wordCount.toLocaleString() ?? 0}</strong></span>
+            <span>预计阅读 <strong>{activeMarkdownStats?.readingMinutes ?? 0} 分钟</strong></span>
+          </>
+        ) : (
+          <>
+            <span>模块 <strong>{totals.modules}</strong></span>
+            <span>表 <strong>{totals.tables}</strong></span>
+            <span>字段 <strong>{totals.columns}</strong></span>
+          </>
+        )}
         <span className="stats-file">
-          {activeDocument ? `当前：${activeDocument.fileName} · ${formatBytes(activeDocument.fileSize)}` : "请打开 XML 文件或文件夹"}
+          {activeDocument
+            ? `当前：${activeDocument.fileName} · ${formatBytes(activeDocument.fileSize)}`
+            : "请打开 XML 或 Markdown 文件"}
         </span>
       </div>
 
@@ -718,7 +1054,14 @@ function App() {
                   onContextMenu={(event) => handleTabContextMenu(event, document.path)}
                   title={document.path}
                 >
-                  <span>{document.fileName.replace(/^scl_schema_/i, "").replace(/\.xml$/i, "")}</span>
+                  {document.kind === "markdown"
+                    ? <FileText size={13} className="tab-type-icon md" />
+                    : <Table2 size={13} className="tab-type-icon xml" />}
+                  <span className={`tab-kind ${document.kind === "markdown" ? "md" : "xml"}`}>
+                    {document.kind === "markdown" ? "MD" : "XML"}
+                  </span>
+                  <span className="tab-file-name">{document.fileName.replace(/^scl_schema_/i, "")}</span>
+                  {active && dirty && <span className="tab-dirty-dot" aria-label="有未保存的修改" />}
                 </button>
                 <button
                   type="button"
@@ -731,11 +1074,99 @@ function App() {
               </div>
             );
           })}
+          {isFullscreen && (
+            <>
+              <span className="fullscreen-tab-spacer" />
+              <button
+                type="button"
+                className="fullscreen-exit"
+                onClick={() => void toggleFullscreen()}
+                title="退出全屏（F11 / Esc）"
+              >
+                <Minimize2 size={14} />退出全屏
+              </button>
+            </>
+          )}
         </div>
       )}
-      <main className={`workspace ${activeDocument ? (activeDocument.kind === "xml" ? "generic-workspace" : "") : "empty-workspace"}`}>
+      {isFullscreen && documents.length === 0 && (
+        <button
+          type="button"
+          className="fullscreen-empty-exit"
+          onClick={() => void toggleFullscreen()}
+          title="退出全屏（F11 / Esc）"
+        >
+          <Minimize2 size={15} />退出全屏
+        </button>
+      )}
+      <main
+        className={`workspace ${activeDocument?.kind === "xml" ? "generic-workspace" : ""} ${activeDocument?.kind === "markdown" ? "markdown-workspace" : ""} ${activeDocument ? "" : "empty-workspace"}`}
+        style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
+      >
         {activeDocument ? (
-          activeDocument.kind === "xml" ? (
+          activeDocument.kind === "markdown" ? (
+            <>
+              <MarkdownOutline
+                headings={markdownHeadings}
+                fileName={activeDocument.fileName}
+                search={search}
+                settings={markdownSettings}
+              />
+              <div
+                className="sidebar-resizer"
+                role="separator"
+                aria-label="调整 Markdown 导航栏宽度"
+                aria-orientation="vertical"
+                onPointerDown={startSidebarResize}
+                onPointerMove={moveSidebarResize}
+                onPointerUp={stopSidebarResize}
+                onPointerCancel={stopSidebarResize}
+              />
+              <section className="content-pane markdown-content-pane" data-testid="content-pane">
+                {mode === "markdown-edit" ? (
+                  <div className="markdown-edit-page" data-testid="markdown-edit-page">
+                    <div className="edit-heading">
+                      <div>
+                        <div className="eyebrow">Markdown 编辑器 · {editorEncoding}</div>
+                        <h1>{activeDocument.fileName}</h1>
+                        <p>{dirty ? "有未保存的修改" : "内容已与磁盘同步"}</p>
+                      </div>
+                      <div className="edit-actions">
+                        <button type="button" className="secondary-button" onClick={() => void cancelEdit()}>
+                          取消
+                        </button>
+                        <button type="button" className="secondary-button" onClick={() => void saveMarkdownEdit(false)} disabled={!dirty}>
+                          <Save size={16} />仅保存
+                        </button>
+                        <button type="button" className="primary-button" onClick={() => void saveMarkdownEdit(true)}>
+                          <CheckCircle2 size={16} />保存并阅读
+                        </button>
+                      </div>
+                    </div>
+                    <div className="editor-shell markdown-editor-shell">
+                      <MarkdownEditor
+                        value={editorContent}
+                        onChange={(value) => {
+                          setEditorContent(value);
+                          editorRevisionRef.current += 1;
+                          setDirty(true);
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <MarkdownView
+                    source={activeDocument.source}
+                    currentPath={activeDocument.path}
+                    settings={markdownSettings}
+                    onLocalStyleChange={applyMarkdownLocalStyle}
+                    onLocalStyleError={(message) => setToast({ kind: "error", message })}
+                    onOpenLocalPath={(path) => void loadPaths([path])}
+                  />
+                )}
+              </section>
+            </>
+          ) : activeDocument.kind === "xml" ? (
             <section className="content-pane" data-testid="content-pane">
               <GenericXmlView document={activeDocument} />
             </section>
@@ -747,6 +1178,16 @@ function App() {
                 search={search}
                 selectedTableIndex={selectedTableIndex}
                 onSelectTable={(table) => void selectTable(table)}
+              />
+              <div
+                className="sidebar-resizer"
+                role="separator"
+                aria-label="调整 XML 数据表导航栏宽度"
+                aria-orientation="vertical"
+                onPointerDown={startSidebarResize}
+                onPointerMove={moveSidebarResize}
+                onPointerUp={stopSidebarResize}
+                onPointerCancel={stopSidebarResize}
               />
               <section className="content-pane" data-testid="content-pane">
                 {mode === "overview" && (
@@ -810,17 +1251,17 @@ function App() {
         ) : (
           <div className="welcome" data-testid="welcome">
             <div className="welcome-icon"><Table2 size={42} /></div>
-            <h1>打开 SCL Schema XML</h1>
-            <p>支持多文件标签、全字段搜索、直接编辑校验和浏览器级自适应表格。</p>
+            <h1>打开 XML 或 Markdown 文档</h1>
+            <p>支持 SCL Schema 数据库结构查看、Markdown 文档阅读和直接编辑，所有文件都在同一套标签页中管理。</p>
             <div className="welcome-actions">
               <button type="button" className="primary-button" onClick={openFolder}>
-                <FolderOpen size={17} />打开数据库设计文件夹
+                <FolderOpen size={17} />打开文件夹
               </button>
               <button type="button" className="secondary-button" onClick={openFiles}>
-                <FilePlus2 size={17} />打开 XML 文件
+                <FilePlus2 size={17} />打开 XML / Markdown 文件
               </button>
             </div>
-            <div className="welcome-hint"><HelpCircle size={15} />也可以直接把 XML 文件或文件夹拖进窗口</div>
+            <div className="welcome-hint"><HelpCircle size={15} />也可以直接把 XML 或 Markdown 文件拖进窗口</div>
           </div>
         )}
       </main>
@@ -828,7 +1269,7 @@ function App() {
       {dragActive && (
         <div className="drop-overlay">
           <FolderOpen size={44} />
-          <strong>松开以打开 XML 文件或文件夹</strong>
+          <strong>松开以打开 XML / Markdown 文件或文件夹</strong>
         </div>
       )}
 
@@ -845,6 +1286,13 @@ function App() {
           <button type="button" aria-label="关闭提示" onClick={() => setToast(null)}><X size={14} /></button>
         </div>
       )}
+
+      <MarkdownSettingsPanel
+        open={markdownSettingsOpen}
+        settings={markdownSettings}
+        onChange={setMarkdownSettings}
+        onClose={() => setMarkdownSettingsOpen(false)}
+      />
 
       {tabMenu && createPortal(
         <>
@@ -876,7 +1324,11 @@ function App() {
         document.body,
       )}
       <footer className="app-footer">
-        <span>{activeDocument ? `${activeDocument.encoding} · ${activeDocument.rootTag}` : "就绪"}</span>
+        <span>
+          {activeDocument
+            ? `${activeDocument.encoding} · ${activeDocument.kind === "markdown" ? "Markdown" : activeDocument.rootTag}`
+            : "就绪"}
+        </span>
         <span>{activeIndex >= 0 ? `标签 ${activeIndex + 1}/${documents.length}` : `${documents.length} 个文件`}</span>
       </footer>
     </div>

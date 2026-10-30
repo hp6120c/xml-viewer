@@ -353,7 +353,7 @@ input:focus-visible {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: 278px minmax(0, 1fr);
+  grid-template-columns: clamp(200px, var(--sidebar-width, 278px), 520px) 6px minmax(0, 1fr);
   background: #eef3f8;
 }
 
@@ -1291,7 +1291,7 @@ input:focus-visible {
 
 @media (max-width: 1180px) {
   .workspace {
-    grid-template-columns: 244px minmax(0, 1fr);
+    grid-template-columns: clamp(200px, var(--sidebar-width, 244px), 45vw) 6px minmax(0, 1fr);
   }
 
   .page {
@@ -1310,7 +1310,7 @@ input:focus-visible {
 
 @media (max-width: 1000px) {
   .workspace {
-    grid-template-columns: 224px minmax(0, 1fr);
+    grid-template-columns: clamp(200px, var(--sidebar-width, 224px), 45vw) 6px minmax(0, 1fr);
   }
 
   .brand span {
@@ -1418,6 +1418,197 @@ input:focus-visible {
 
 .workspace.generic-workspace {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.tab-type-icon {
+  flex: 0 0 auto;
+}
+
+.tab-type-icon.xml {
+  color: #1973c7;
+}
+
+.tab-type-icon.md {
+  color: #15805f;
+}
+
+.file-tab .tab-kind {
+  flex: 0 0 auto;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 8.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.04em;
+}
+
+.file-tab .tab-kind.xml {
+  color: #1973c7;
+  background: #eaf4ff;
+}
+
+.file-tab .tab-kind.md {
+  color: #15805f;
+  background: #e9f8f2;
+}
+
+.file-tab > .tab-file-name {
+  max-width: 142px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tab-dirty-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 999px;
+  background: #e58a22;
+}
+
+.workspace.markdown-workspace {
+  grid-template-columns: clamp(200px, var(--sidebar-width, 260px), 520px) 6px minmax(0, 1fr);
+}
+
+.sidebar-resizer {
+  position: relative;
+  z-index: 2;
+  min-height: 0;
+  border-right: 1px solid #cfdbe7;
+  background: #eef3f8;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.sidebar-resizer::after {
+  content: "";
+  position: absolute;
+  inset: 0 -3px;
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer:active {
+  background: #cfe5f8;
+}
+
+.markdown-outline .sidebar-title {
+  height: 39px;
+  flex: 0 0 39px;
+  padding: 0 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #dce5ee;
+  color: #4e6377;
+  font-family: var(--md-nav-font-family);
+  font-size: var(--md-nav-font-size);
+  font-weight: var(--md-nav-font-weight);
+  letter-spacing: 0.02em;
+}
+
+.markdown-outline .sidebar-title > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.markdown-outline .sidebar-count {
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #1d74c2;
+  background: #e3effb;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.markdown-file-label {
+  margin: 10px 10px 4px;
+  padding: 7px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #dbe5ee;
+  border-radius: 6px;
+  color: #6c8194;
+  background: #fff;
+  font-family: var(--md-nav-font-family);
+  font-size: 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.markdown-toc-list {
+  padding: 6px 8px 18px;
+  overflow: auto;
+}
+
+.markdown-toc-item {
+  min-height: 29px;
+  padding: 5px 8px;
+  display: flex;
+  align-items: center;
+  border-left: 2px solid transparent;
+  border-radius: 4px;
+  color: #3c5267;
+  font-family: var(--md-nav-font-family);
+  font-size: var(--md-nav-font-size);
+  font-weight: var(--md-nav-font-weight);
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.markdown-toc-item:hover {
+  color: #2978bd;
+  background: #eaf2fa;
+}
+
+.markdown-toc-item.level-2 {
+  padding-left: 20px;
+  font-size: calc(var(--md-nav-font-size) - 0.5px);
+}
+
+.markdown-toc-item.level-3,
+.markdown-toc-item.level-4,
+.markdown-toc-item.level-5,
+.markdown-toc-item.level-6 {
+  padding-left: 31px;
+  font-size: calc(var(--md-nav-font-size) - 1px);
+}
+
+.markdown-toc-empty {
+  padding: 28px 12px;
+  color: #8b9cad;
+  text-align: center;
+  font-size: 11px;
+}
+
+.markdown-content-pane {
+  flex-direction: column;
+  overflow: auto;
+  background: #fff;
+}
+
+.markdown-edit-page {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 18px 24px 26px;
+  display: flex;
+  flex-direction: column;
+}
+
+.markdown-editor-shell {
+  flex: 1;
+  min-height: 0;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+  scroll-margin-top: 18px;
 }
 
 .generic-xml-page {
@@ -1585,6 +1776,104 @@ input:focus-visible {
 .zoom-control button:disabled {
   opacity: 0.35;
   cursor: default;
+}
+
+.new-file-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.new-file-menu-popup {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 70;
+  min-width: 174px;
+  padding: 5px;
+  border: 1px solid #cfdce8;
+  border-radius: 7px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(26, 51, 75, 0.2);
+}
+
+.new-file-menu-popup button {
+  width: 100%;
+  min-height: 31px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 5px;
+  color: #405a71;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-size: 11.5px;
+}
+
+.new-file-menu-popup button:hover {
+  color: #1973c7;
+  background: #edf5fd;
+}
+
+.fullscreen-mode .app-header,
+.fullscreen-mode .toolbar,
+.fullscreen-mode .stats-bar,
+.fullscreen-mode .app-footer {
+  display: none;
+}
+
+.fullscreen-mode .tab-bar {
+  flex: 0 0 39px;
+  padding-top: 4px;
+  align-items: flex-end;
+}
+
+.fullscreen-tab-spacer {
+  flex: 1;
+  min-width: 12px;
+}
+
+.fullscreen-exit {
+  height: 29px;
+  margin: 0 0 3px 7px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #cbd9e5;
+  border-radius: 5px;
+  background: #f8fbfd;
+  color: #5b7185;
+  cursor: pointer;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.fullscreen-exit:hover,
+.fullscreen-empty-exit:hover {
+  color: #1973c7;
+  border-color: #9fc5e9;
+  background: #edf6ff;
+}
+
+.fullscreen-empty-exit {
+  position: fixed;
+  top: 9px;
+  right: 12px;
+  z-index: 20;
+  height: 30px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #cbd9e5;
+  border-radius: 5px;
+  background: #f8fbfd;
+  color: #5b7185;
+  cursor: pointer;
+  font-size: 10.5px;
 }
 
 @media (max-width: 1100px) {
