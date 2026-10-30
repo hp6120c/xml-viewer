@@ -87,6 +87,7 @@ import {
 
 import { loadSession, saveSession } from "./lib/session";
 import { checkForUpdate, installUpdate } from "./lib/updater";
+import type { UpdateDetails } from "./lib/updater";
 import { extractMarkdownHeadings, markdownStats } from "./lib/markdown";
 import {
   loadMarkdownSettings,
@@ -98,7 +99,21 @@ type ViewMode = "overview" | "detail" | "edit" | "markdown-read" | "markdown-edi
 type ToastState = { kind: "success" | "error" | "info"; message: string } | null;
 type TabMenuState = { x: number; y: number; path: string } | null;
 
-async function confirmUpdate(message: string): Promise<boolean> {
+function updateNotes(update: UpdateDetails): string {
+  const notes = update.body.trim();
+  return notes || "该版本未提供详细更新说明。";
+}
+
+async function confirmUpdate(update: UpdateDetails): Promise<boolean> {
+  const message = [
+    `发现新版本 V${update.version}（当前 V${update.currentVersion}）`,
+    update.date ? `发布时间：${update.date}` : "",
+    "",
+    "更新内容：",
+    updateNotes(update),
+    "",
+    "是否立即下载并安装？",
+  ].filter((line, index, lines) => line !== "" || lines[index - 1] !== "").join("\n");
   if (isDesktopApp()) {
     const dialog = await import("@tauri-apps/plugin-dialog");
     return dialog.confirm(message, {
@@ -726,9 +741,7 @@ function App() {
         if (!silent) setToast({ kind: "success", message: "当前已是最新版本" });
         return;
       }
-      const confirmed = await confirmUpdate(
-        `发现新版本 V${update.version}（当前 V${update.currentVersion}）${update.date ? `\n发布时间：${update.date}` : ""}\n\n是否立即下载并安装？`,
-      );
+      const confirmed = await confirmUpdate(update);
       if (!confirmed) return;
       if (dirtyRef.current) {
         const discard = await askDiscard(
