@@ -34,6 +34,25 @@ try {
   assert.match(body, /目录结构/);
   assert.match(body, /XML \/ Markdown 编辑器/);
   await page.getByText("Designed and developed by Austin.H", { exact: true }).waitFor();
+  const footerMetrics = await page.evaluate(() => {
+    const footer = document.querySelector(".app-footer");
+    const author = document.querySelector(".footer-author");
+    const header = document.querySelector(".app-header");
+    if (!footer || !author || !header) return null;
+    const footerRect = footer.getBoundingClientRect();
+    const authorRect = author.getBoundingClientRect();
+    return {
+      authorCenter: authorRect.left + authorRect.width / 2,
+      footerCenter: footerRect.left + footerRect.width / 2,
+      inFooter: authorRect.top >= footerRect.top && authorRect.bottom <= footerRect.bottom,
+      headerContainsAuthor: header.textContent?.includes("Designed and developed by Austin.H"),
+    };
+  });
+  assert(footerMetrics);
+  assert.equal(footerMetrics.inFooter, true);
+  assert.equal(footerMetrics.headerContainsAuthor, false);
+  assert(Math.abs(footerMetrics.authorCenter - footerMetrics.footerCenter) <= 1);
+  assert.equal(await page.locator(".muya-font-toolbar").count(), 0);
   assert.equal(await page.locator(".tab-dirty-dot").count(), 0);
 
   const layouts = {};
@@ -74,50 +93,16 @@ try {
   );
   assert.notEqual(sidebarAfter, sidebarBefore);
 
-  await page.evaluate(() => {
-    const target = Array.from(document.querySelectorAll(".mu-plain-text"))
-      .find((element) => element.textContent?.includes("快速开始"));
-    if (!target?.firstChild || target.firstChild.nodeType !== Node.TEXT_NODE) {
-      throw new Error("Muya heading text node not found");
-    }
-    const range = document.createRange();
-    range.setStart(target.firstChild, 0);
-    range.setEnd(target.firstChild, target.firstChild.textContent?.length ?? 0);
-    const selection = window.getSelection();
-    selection.removeAllRanges();
-    selection.addRange(range);
-    target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-  });
-  await page.locator('select[aria-label="文字字号"]').selectOption("24px");
-  await page.getByRole("button", { name: "应用字体" }).click();
-  await page.waitForTimeout(500);
-  const headingHtml = await page.locator(".mu-atx-heading").nth(1).innerHTML();
-  assert.match(headingHtml, /font-size: 24px/);
-  assert.match(await page.locator(".mu-atx-heading").nth(1).innerText(), /快速开始/);
-  assert.doesNotMatch(await page.locator(".mu-atx-heading").nth(1).innerText(), /<span/i);
-  const headingFontSize = await page
-    .locator(".mu-atx-heading")
-    .nth(1)
-    .locator(".mu-inline-rule")
-    .evaluate((element) => getComputedStyle(element).fontSize);
-  assert.equal(headingFontSize, "24px");
-  await page.locator(".tab-dirty-dot").waitFor();
-
   await page.locator("a.markdown-toc-item", { hasText: "目录结构" }).click();
   await page.waitForTimeout(500);
   assert((await page.locator(".muya-markdown-host").evaluate((node) => node.scrollTop)) > 0);
-
-  await page.getByRole("button", { name: "保存更改" }).click();
-  await page.getByText("Markdown 文档已保存", { exact: true }).waitFor({ timeout: 10000 });
-  await page.locator(".tab-dirty-dot").waitFor({ state: "detached" });
 
   const screenshot = path.join(outputDir, "muya-markdown-editor-1440x900.png");
   await page.screenshot({ path: screenshot, fullPage: true });
   console.log(JSON.stringify({
     ok: true,
     screenshot,
-    headingHtml,
-    headingFontSize,
+    footerMetrics,
     layouts,
     sidebarWidths: { before: sidebarBefore, after: sidebarAfter },
     text: body.slice(0, 500),

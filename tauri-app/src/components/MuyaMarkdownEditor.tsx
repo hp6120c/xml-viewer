@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import {
   CodeBlockLanguageSelector,
   EmojiSelector,
@@ -36,19 +36,7 @@ interface MuyaMarkdownEditorProps {
   currentPath: string;
   settings: MarkdownReadingSettings;
   onChange: (markdown: string) => void;
-  onStatus: (message: string) => void;
   onOpenLocalPath?: (path: string) => void;
-}
-
-interface MuyaTextSelection {
-  anchorBlock?: {
-    text?: string;
-    setCursor?: (start: number, end: number, focus?: boolean) => void;
-  };
-  focusBlock?: unknown;
-  anchor?: { offset: number };
-  focus?: { offset: number };
-  isCollapsed?: boolean;
 }
 
 interface PreparedMarkdown {
@@ -278,89 +266,6 @@ async function hydrateImages(
   }));
 }
 
-function extractTextSelection(editor: Muya): MuyaTextSelection | null {
-  const candidate = editor as unknown as {
-    getSelection?: () => MuyaTextSelection | null;
-    editor?: { selection?: { getSelection?: () => MuyaTextSelection | null } };
-  };
-  return candidate.getSelection?.()
-    ?? candidate.editor?.selection?.getSelection?.()
-    ?? null;
-}
-
-function wrapSelectedTextWithFont(selected: string, style: string): string | null {
-  let prefix = "";
-  let suffix = "";
-  let inner = selected;
-  for (const marker of ["***", "___", "**", "__", "~~", "*", "_"]) {
-    if (
-      inner.startsWith(marker)
-      && inner.endsWith(marker)
-      && inner.length > marker.length * 2
-    ) {
-      prefix = marker;
-      suffix = marker;
-      inner = inner.slice(marker.length, -marker.length);
-      break;
-    }
-  }
-
-  if (/[`*_~]/.test(inner)) return null;
-  const styled = `<span style="${style}">${inner}</span>`;
-  if (prefix) return `${prefix}${styled}${suffix}`;
-
-  const htmlPair = /^<(strong|b|em|i|u|mark|del|s|sub|sup)(\s[^>]*)?>([\s\S]*)<\/\1>$/i.exec(selected);
-  if (htmlPair) {
-    return `<${htmlPair[1]}${htmlPair[2] ?? ""}><span style="${style}">${htmlPair[3]}</span></${htmlPair[1]}>`;
-  }
-  const existingSpan = /^<span\b([^>]*)>([\s\S]*)<\/span>$/i.exec(selected);
-  if (existingSpan) {
-    const attrs = existingSpan[1].replace(/\sstyle=(?:"[^"]*"|'[^']*')/i, "");
-    return `<span${attrs} style="${style}">${existingSpan[2]}</span>`;
-  }
-  return styled;
-}
-
-function applyFontToSelection(
-  editor: Muya,
-  fontSize: string,
-  fontFamily: string,
-  fallback: MuyaTextSelection | null,
-): "ok" | "no-selection" | "complex-selection" {
-  const current = extractTextSelection(editor);
-  const selection = current && !current.isCollapsed ? current : fallback;
-  const block = selection?.anchorBlock;
-  if (
-    !selection
-    || selection.isCollapsed
-    || !block?.text
-    || block !== selection.focusBlock
-    || !selection.anchor
-    || !selection.focus
-  ) {
-    return "no-selection";
-  }
-
-  const start = Math.min(selection.anchor.offset, selection.focus.offset);
-  const end = Math.max(selection.anchor.offset, selection.focus.offset);
-  if (start === end || start < 0 || end > block.text.length) return "no-selection";
-
-  const family = {
-    system: "'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI', sans-serif",
-    serif: "'Noto Serif SC', 'Songti SC', Georgia, serif",
-    mono: "'Cascadia Code', 'JetBrains Mono', Consolas, monospace",
-  }[fontFamily] ?? fontFamily;
-  const style = `font-size: ${fontSize}; font-family: ${family}`;
-  const selected = block.text.slice(start, end);
-  const replacement = wrapSelectedTextWithFont(selected, style);
-  if (!replacement) return "complex-selection";
-  block.text = `${block.text.slice(0, start)}${replacement}${block.text.slice(end)}`;
-  const selectedStart = replacement.indexOf(selected);
-  const selectionStart = start + (selectedStart >= 0 ? selectedStart : 0);
-  block.setCursor?.(selectionStart, selectionStart + selected.length, true);
-  return "ok";
-}
-
 function clearHtmlFormattingAroundSelection(
   block: { text: string; setCursor: (start: number, end: number, focus?: boolean) => void },
   selectedText: string,
@@ -410,7 +315,6 @@ export function MuyaMarkdownEditor({
   currentPath,
   settings,
   onChange,
-  onStatus,
   onOpenLocalPath,
 }: MuyaMarkdownEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -421,19 +325,14 @@ export function MuyaMarkdownEditor({
   const sourceRevisionRef = useRef(0);
   const restoreMarkdownRef = useRef<(value: string) => string>((value) => value);
   const onChangeRef = useRef(onChange);
-  const onStatusRef = useRef(onStatus);
   const currentPathRef = useRef(currentPath);
   const openLocalPathRef = useRef(onOpenLocalPath);
   const imageCacheRef = useRef(new Map<string, string>());
   const imageHydrationFrameRef = useRef<number | null>(null);
-  const selectionSnapshotRef = useRef<MuyaTextSelection | null>(null);
   sourceRef.current = source;
   onChangeRef.current = onChange;
-  onStatusRef.current = onStatus;
   currentPathRef.current = currentPath;
   openLocalPathRef.current = onOpenLocalPath;
-  const [fontSize, setFontSize] = useState("16px");
-  const [fontFamily, setFontFamily] = useState("system");
 
   const scheduleImageHydration = () => {
     if (imageHydrationFrameRef.current !== null) return;
@@ -603,7 +502,6 @@ export function MuyaMarkdownEditor({
     const revision = ++sourceRevisionRef.current;
     if (currentPath !== lastPreparedPathRef.current) imageCacheRef.current.clear();
     lastMarkdownRef.current = source;
-    selectionSnapshotRef.current = null;
     void prepareMarkdownSource(source, currentPath, imageCacheRef.current).then((prepared) => {
       if (
         revision !== sourceRevisionRef.current
@@ -650,29 +548,6 @@ export function MuyaMarkdownEditor({
     };
   }, []);
 
-  const applyFont = () => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    const result = applyFontToSelection(
-      editor,
-      fontSize,
-      fontFamily,
-      selectionSnapshotRef.current,
-    );
-    onStatusRef.current(result === "ok"
-      ? `已应用字体：${fontSize} / ${fontFamily}`
-      : result === "complex-selection"
-        ? "当前选区包含多种 Markdown 格式，请缩小到连续纯文字后再设置字体"
-        : "请先在同一段落内选中文字，再应用字体");
-  };
-
-  const rememberSelection = () => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    const selection = extractTextSelection(editor);
-    selectionSnapshotRef.current = selection && !selection.isCollapsed ? selection : null;
-  };
-
   const editorStyle = {
     ...markdownSettingsVars(settings),
     "--editor-color": settings.textColor,
@@ -692,21 +567,6 @@ export function MuyaMarkdownEditor({
       data-testid="muya-markdown-editor"
       style={editorStyle}
     >
-      <div className="muya-font-toolbar" onPointerDownCapture={rememberSelection}>
-        <span className="muya-font-toolbar-label">字体</span>
-        <select value={fontSize} onChange={(event) => setFontSize(event.target.value)} aria-label="文字字号">
-          {["12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px"].map((size) => (
-            <option value={size} key={size}>{size}</option>
-          ))}
-        </select>
-        <select value={fontFamily} onChange={(event) => setFontFamily(event.target.value)} aria-label="文字字体">
-          <option value="system">系统字体</option>
-          <option value="serif">衬线字体</option>
-          <option value="mono">等宽字体</option>
-        </select>
-        <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={applyFont}>应用字体</button>
-        <span className="muya-font-toolbar-hint">选中文字后可叠加 MarkText 的粗体、斜体、下划线和颜色工具</span>
-      </div>
       <div ref={hostRef} className="muya-markdown-host" />
     </div>
   );

@@ -927,8 +927,6 @@ function App() {
                 : activeDocument?.kind === "xml"
                   ? "通用 XML 文档"
                   : "SCL Schema XML"}
-              {" · "}
-              <strong>Designed and developed by Austin.H</strong>
             </span>
           </div>
         </div>
@@ -1193,7 +1191,6 @@ function App() {
                     currentPath={activeDocument.path}
                     settings={markdownSettings}
                     onChange={handleMuyaMarkdownChange}
-                    onStatus={(message) => setToast({ kind: "info", message })}
                     onOpenLocalPath={(path) => void loadPaths([path])}
                   />
                 </Suspense>
@@ -1357,12 +1354,15 @@ function App() {
         document.body,
       )}
       <footer className="app-footer">
-        <span>
+        <span className="footer-meta">
           {activeDocument
             ? `${activeDocument.encoding} · ${activeDocument.kind === "markdown" ? "Markdown" : activeDocument.rootTag}`
             : "就绪"}
         </span>
-        <span>{activeIndex >= 0 ? `标签 ${activeIndex + 1}/${documents.length}` : `${documents.length} 个文件`}</span>
+        <strong className="footer-author">Designed and developed by Austin.H</strong>
+        <span className="footer-meta footer-tab-status">
+          {activeIndex >= 0 ? `标签 ${activeIndex + 1}/${documents.length}` : `${documents.length} 个文件`}
+        </span>
       </footer>
     </div>
   );

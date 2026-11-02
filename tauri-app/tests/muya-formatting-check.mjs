@@ -84,27 +84,13 @@ try {
   assert.match(await paragraphHtml(text), /<strong\b/);
   await clickFormat("strong");
   assert.doesNotMatch(await paragraphHtml(text), /<strong\b/);
-
-  await clickFormat("strong");
-  await page.locator('select[aria-label="文字字号"]').selectOption("24px");
-  await page.getByRole("button", { name: "应用字体" }).click();
-  await page.waitForTimeout(150);
-  const combinedHtml = await paragraphHtml(text);
-  assert.match(combinedHtml, /font-size: 24px/);
-  assert.match(combinedHtml, /<strong\b/);
-  assert.equal(await page.locator(".mu-paragraph-content").first().locator(".mu-raw-html").evaluate(
-    (element) => getComputedStyle(element).fontSize,
-  ), "24px");
-  assert.equal(await page.locator(".mu-paragraph-content").first().locator("strong").evaluate(
-    (element) => getComputedStyle(element).fontWeight,
-  ), "700");
+  assert.equal(await page.locator(".muya-font-toolbar").count(), 0);
 
   assert.deepEqual(pageErrors, [], `page errors: ${pageErrors.join("; ")}`);
   console.log(JSON.stringify({
     ok: true,
-    formats: ["strong", "em", "u", "mark", "clear", "strong-toggle", "strong-plus-font"],
+    formats: ["strong", "em", "u", "mark", "clear", "strong-toggle"],
     clearedHtml: cleared,
-    combinedHtml,
   }, null, 2));
 } finally {
   await browser.close();

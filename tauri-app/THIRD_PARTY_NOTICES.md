@@ -12,7 +12,7 @@ projects. Their licenses remain in effect.
 
 The WYSIWYG Markdown editing engine is provided by `@muyajs/core`. The
 application-specific toolbar, file handling, file associations, update flow,
-and local font-size/font-family controls are maintained by this project.
+and resource handling are maintained by this project.
 
 ```text
 MIT License
