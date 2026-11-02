@@ -1,6 +1,6 @@
 # XML / Markdown 编辑器
 
-当前测试版本为 **V2.1.0**，架构为 **Tauri 2 + React + TypeScript + Rust**，运行在 Windows WebView2/Chromium 上。本版本在 XML 数据库编辑器基础上增加 Markdown 阅读和编辑能力，使用标准 HTML/CSS 自适应布局。
+当前正式版本为 **V2.2.0**，架构为 **Tauri 2 + React + TypeScript + Rust**，运行在 Windows WebView2/Chromium 上。本版本在 XML 数据库编辑器基础上增加 Markdown 阅读和编辑能力，使用标准 HTML/CSS 自适应布局。
 
 ## 目录
 
