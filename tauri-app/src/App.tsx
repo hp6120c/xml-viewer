@@ -16,7 +16,9 @@ import {
 import {
   AlertCircle,
   CheckCircle2,
+  Code2,
   Download,
+  Eye,
   FileText,
   FilePlus2,
   FolderOpen,
@@ -96,6 +98,12 @@ import type { OpenedDocument, TableInfo } from "./types";
 const MuyaMarkdownEditor = lazy(() =>
   import("./components/MuyaMarkdownEditor").then((module) => ({
     default: module.MuyaMarkdownEditor,
+  })),
+);
+
+const MarkdownSourceEditor = lazy(() =>
+  import("./components/MarkdownSourceEditor").then((module) => ({
+    default: module.MarkdownSourceEditor,
   })),
 );
 
@@ -643,7 +651,7 @@ function App() {
     }
   }, [activeDocument, dirty, editorContent]);
 
-  const handleMuyaMarkdownChange = useCallback((nextSource: string) => {
+  const handleMarkdownChange = useCallback((nextSource: string) => {
     if (!activeDocument || activeDocument.kind !== "markdown") return;
     setEditorContent(nextSource);
     markdownSourceRef.current = nextSource;
@@ -656,6 +664,19 @@ function App() {
         : document,
     ));
   }, [activeDocument]);
+
+  const toggleMarkdownSourceMode = useCallback(async () => {
+    if (!activeDocument || activeDocument.kind !== "markdown") return;
+    if (mode === "markdown-edit") {
+      setMode("markdown-read");
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+    });
+    setEditorContent(markdownSourceRef.current || activeDocument.source);
+    setMode("markdown-edit");
+  }, [activeDocument, mode]);
 
   const cancelEdit = useCallback(async () => {
     if (dirty) {
@@ -876,6 +897,7 @@ function App() {
       if (event.key.toLowerCase() === "e") {
         event.preventDefault();
         if (activeDocument?.kind === "markdown") {
+          void toggleMarkdownSourceMode();
           return;
         } else if (mode === "edit") {
           void saveEdit(true);
@@ -895,6 +917,7 @@ function App() {
     mode,
     saveEdit,
     saveMarkdownEdit,
+    toggleMarkdownSourceMode,
     toggleFullscreen,
   ]);
 
@@ -972,14 +995,25 @@ function App() {
           <RefreshCw size={17} />刷新
         </button>
         {activeDocument?.kind === "markdown" ? (
-          <button
-            type="button"
-            className="tool-button"
-            onClick={() => void saveMarkdownEdit(false)}
-            disabled={!dirty}
-          >
-            <Save size={17} />保存更改
-          </button>
+          <>
+            <button
+              type="button"
+              className={`tool-button ${mode === "markdown-edit" ? "active" : ""}`}
+              onClick={() => void toggleMarkdownSourceMode()}
+              title={mode === "markdown-edit" ? "切换到所见即所得模式（Ctrl+E）" : "切换到 Markdown 源码模式（Ctrl+E）"}
+            >
+              {mode === "markdown-edit" ? <Eye size={17} /> : <Code2 size={17} />}
+              {mode === "markdown-edit" ? "所见即所得" : "源码模式"}
+            </button>
+            <button
+              type="button"
+              className="tool-button"
+              onClick={() => void saveMarkdownEdit(false)}
+              disabled={!dirty}
+            >
+              <Save size={17} />保存更改
+            </button>
+          </>
         ) : (
           <button
             type="button"
@@ -1029,7 +1063,8 @@ function App() {
             type="button"
             className="tool-button"
             onClick={() => setMarkdownSettingsOpen(true)}
-            title="调整 Markdown 阅读样式"
+            disabled={mode === "markdown-edit"}
+            title={mode === "markdown-edit" ? "切回所见即所得模式后调整阅读样式" : "调整 Markdown 阅读样式"}
           >
             <SlidersHorizontal size={17} />基础样式
           </button>
@@ -1185,15 +1220,26 @@ function App() {
                 onPointerCancel={stopSidebarResize}
               />
               <section className="content-pane markdown-content-pane" data-testid="content-pane">
-                <Suspense fallback={<div className="muya-loading">正在加载 Markdown 编辑器...</div>}>
-                  <MuyaMarkdownEditor
-                    source={activeDocument.source}
-                    currentPath={activeDocument.path}
-                    settings={markdownSettings}
-                    onChange={handleMuyaMarkdownChange}
-                    onOpenLocalPath={(path) => void loadPaths([path])}
-                  />
-                </Suspense>
+                {mode === "markdown-edit" ? (
+                  <div className="markdown-source-shell" data-testid="markdown-source-page">
+                    <Suspense fallback={<div className="muya-loading">正在加载 Markdown 源码编辑器...</div>}>
+                      <MarkdownSourceEditor
+                        value={editorContent}
+                        onChange={handleMarkdownChange}
+                      />
+                    </Suspense>
+                  </div>
+                ) : (
+                  <Suspense fallback={<div className="muya-loading">正在加载 Markdown 编辑器...</div>}>
+                    <MuyaMarkdownEditor
+                      source={activeDocument.source}
+                      currentPath={activeDocument.path}
+                      settings={markdownSettings}
+                      onChange={handleMarkdownChange}
+                      onOpenLocalPath={(path) => void loadPaths([path])}
+                    />
+                  </Suspense>
+                )}
               </section>
             </>
           ) : activeDocument.kind === "xml" ? (

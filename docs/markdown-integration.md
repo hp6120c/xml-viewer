@@ -19,10 +19,10 @@ Markdown 没有模块、数据表、字段等数据库语义，因此不将 XML 
 
 ## 当前落地方式
 
-Markdown 阅读和源码编辑已经合并为一个所见即所得界面，核心采用 MarkText 的
-Muya 内核（`@muyajs/core`）。项目保留 React/Tauri 外壳、文件关联、自动更新和
-相对图片安全加载；早期 CodeMirror Markdown
-分栏方案已不作为当前实现。Muya/MarkText 的 MIT 许可声明见
+Markdown 默认使用所见即所得界面，核心采用 MarkText 的 Muya 内核
+（`@muyajs/core`），同时保留 CodeMirror Markdown 源码模式用于处理浮动菜单
+尚未覆盖的语法。项目保留 React/Tauri 外壳、文件关联、自动更新和相对图片
+安全加载。Muya/MarkText 的 MIT 许可声明见
 [`../tauri-app/THIRD_PARTY_NOTICES.md`](../tauri-app/THIRD_PARTY_NOTICES.md)。
 
 ## md-reader 功能拆分

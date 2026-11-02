@@ -62,6 +62,97 @@
   display: none;
 }
 
+.mu-format-picker.mu-viewer-has-color-tools {
+  width: min(415px, calc(100vw - 24px));
+  height: auto;
+}
+
+.mu-viewer-color-item {
+  width: 30px !important;
+  flex: 0 0 30px;
+}
+
+.mu-viewer-color-control {
+  width: 22px;
+  height: 22px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.mu-viewer-color-control input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.mu-viewer-color-icon {
+  color: #63788c;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  border-bottom: 3px solid #d32f2f;
+  pointer-events: none;
+}
+
+.mu-viewer-background-color .mu-viewer-color-icon {
+  border-bottom: 0;
+  color: #fff176;
+  font-size: 17px;
+  text-shadow: 0 0 1px rgba(55, 71, 85, 0.55);
+}
+
+.mu-viewer-font-controls {
+  min-height: 30px;
+  padding: 4px 9px 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--editor-color-10, rgba(55, 71, 85, 0.1));
+  color: var(--editor-color, #30465b);
+}
+
+.mu-viewer-font-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.mu-viewer-font-control:first-child {
+  flex: 0 0 92px;
+}
+
+.mu-viewer-font-control:nth-child(2) {
+  flex: 1;
+}
+
+.mu-viewer-font-control select {
+  height: 23px;
+  min-width: 0;
+  padding: 0 4px;
+  border: 1px solid var(--editor-color-10, #d7e1ea);
+  border-radius: 3px;
+  color: var(--editor-color, #30465b);
+  background: var(--editor-bg-color, #fff);
+  font-size: 11px;
+}
+
+.mu-viewer-font-control:first-child select {
+  width: 50px;
+}
+
+.mu-viewer-font-control:nth-child(2) select {
+  flex: 1;
+  width: 100%;
+}
+
 .muya-loading {
   width: 100%;
   height: 100%;

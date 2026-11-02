@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
 import { chromium } from "playwright";
 
 const candidates = [
@@ -9,6 +11,8 @@ const candidates = [
 ].filter(Boolean);
 const executablePath = candidates.find((candidate) => existsSync(candidate));
 assert(executablePath, "Chrome or Edge executable was not found");
+const outputDir = path.resolve("..", "..", "outputs");
+await mkdir(outputDir, { recursive: true });
 
 const browser = await chromium.launch({ headless: true, executablePath });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -62,7 +66,7 @@ try {
   const text = "支持 XML 数据库设计和 Markdown 文档阅读、编辑的桌面工具。";
   await selectText(text);
   assert.equal(await page.locator(".mu-format-picker:visible li.item.strong").count(), 1);
-  assert.equal(await page.locator(".mu-format-picker:visible li.item").count(), 10);
+  assert.equal(await page.locator(".mu-format-picker:visible li.item").count(), 12);
 
   await clickFormat("strong");
   assert.match(await paragraphHtml(text), /<strong\b/);
@@ -86,11 +90,55 @@ try {
   assert.doesNotMatch(await paragraphHtml(text), /<strong\b/);
   assert.equal(await page.locator(".muya-font-toolbar").count(), 0);
 
+  await selectText(text);
+  assert.equal(await page.locator(".mu-viewer-color-item").count(), 2);
+  const toolbarScreenshot = path.join(outputDir, "muya-format-toolbar-1440x900.png");
+  await page.screenshot({ path: toolbarScreenshot, fullPage: true });
+  await page.locator('.mu-viewer-text-color input[type="color"]').evaluate((input, value) => {
+    input.value = value;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, "#c62828");
+  await page.waitForFunction(() => {
+    const element = document.querySelector(".mu-paragraph-content .mu-raw-html");
+    return element?.getAttribute("style")?.includes("color:") === true;
+  });
+  assert.match(await paragraphHtml(text), /color:\s*(?:#c62828|rgb\(198,\s*40,\s*40\))/i);
+
+  await selectText(text);
+  await page.locator('.mu-viewer-background-color input[type="color"]').evaluate((input, value) => {
+    input.value = value;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, "#fff176");
+  await page.waitForTimeout(150);
+  const colorHtml = await paragraphHtml(text);
+  assert.match(colorHtml, /background-color:\s*(?:#fff176|rgb\(255,\s*241,\s*118\))/i);
+  assert.match(colorHtml, /color:\s*(?:#c62828|rgb\(198,\s*40,\s*40\))/i);
+
+  await selectText(text);
+  await page.locator('.mu-viewer-font-size select').selectOption("24px");
+  await selectText(text);
+  await page.locator('.mu-viewer-font-family select').selectOption("serif");
+  await page.waitForTimeout(150);
+  const fontHtml = await paragraphHtml(text);
+  assert.match(fontHtml, /font-size:\s*24px/i);
+  assert.match(fontHtml, /font-family:\s*[^;]*(?:Noto Serif|Songti|Georgia)/i);
+
+  await selectText(text);
+  await clickFormat("clear");
+  const colorCleared = await paragraphHtml(text);
+  assert.doesNotMatch(colorCleared, /color:|background-color:|font-size:|font-family:|mu-raw-html/);
+
   assert.deepEqual(pageErrors, [], `page errors: ${pageErrors.join("; ")}`);
   console.log(JSON.stringify({
     ok: true,
-    formats: ["strong", "em", "u", "mark", "clear", "strong-toggle"],
+    formats: ["strong", "em", "u", "mark", "clear", "strong-toggle", "text-color", "background-color", "font-size", "font-family"],
     clearedHtml: cleared,
+    colorHtml,
+    fontHtml,
+    colorCleared,
+    toolbarScreenshot,
   }, null, 2));
 } finally {
   await browser.close();
