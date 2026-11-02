@@ -1,0 +1,23 @@
+.markdown-source-editor {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #fff;
+}
+
+.markdown-source-editor .cm-editor {
+  width: 100%;
+  height: 100%;
+}
+
+.markdown-source-shell {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  padding: 14px 18px 18px;
+  background: #fff;
+}
