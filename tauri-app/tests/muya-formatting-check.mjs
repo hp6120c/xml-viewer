@@ -117,26 +117,17 @@ try {
   assert.match(colorHtml, /color:\s*(?:#c62828|rgb\(198,\s*40,\s*40\))/i);
 
   await selectText(text);
-  await page.locator('.mu-viewer-font-size select').selectOption("24px");
-  await selectText(text);
-  await page.locator('.mu-viewer-font-family select').selectOption("serif");
-  await page.waitForTimeout(150);
-  const fontHtml = await paragraphHtml(text);
-  assert.match(fontHtml, /font-size:\s*24px/i);
-  assert.match(fontHtml, /font-family:\s*[^;]*(?:Noto Serif|Songti|Georgia)/i);
-
-  await selectText(text);
   await clickFormat("clear");
   const colorCleared = await paragraphHtml(text);
-  assert.doesNotMatch(colorCleared, /color:|background-color:|font-size:|font-family:|mu-raw-html/);
+  assert.doesNotMatch(colorCleared, /color:|background-color:|mu-raw-html/);
+  assert.equal(await page.locator(".mu-viewer-font-controls").count(), 0);
 
   assert.deepEqual(pageErrors, [], `page errors: ${pageErrors.join("; ")}`);
   console.log(JSON.stringify({
     ok: true,
-    formats: ["strong", "em", "u", "mark", "clear", "strong-toggle", "text-color", "background-color", "font-size", "font-family"],
+    formats: ["strong", "em", "u", "mark", "clear", "strong-toggle", "text-color", "background-color"],
     clearedHtml: cleared,
     colorHtml,
-    fontHtml,
     colorCleared,
     toolbarScreenshot,
   }, null, 2));
