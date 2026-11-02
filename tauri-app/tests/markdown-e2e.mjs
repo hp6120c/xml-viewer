@@ -14,6 +14,7 @@ page.on("pageerror", (error) => pageErrors.push(String(error)));
 try {
   await openFixtureSession(page, [testFile, fixturePath("generic.xml")], testFile);
   await page.locator('[data-testid="muya-markdown-editor"]').waitFor({ timeout: 20000 });
+  await page.locator(".mu-atx-heading", { hasText: "MD Reader" }).waitFor({ timeout: 10000 });
   const editorText = await page.locator('[data-testid="muya-markdown-editor"]').innerText();
   assert.match(editorText, /MD Reader/);
   assert.match(editorText, /主要特性/);
@@ -24,25 +25,7 @@ try {
   const tabText = await page.locator('[data-testid="tab-bar"]').innerText();
   assert.match(tabText, /MD/);
   assert.ok(tabText.includes(testFileName));
-
-  await page.evaluate(() => {
-    const target = Array.from(document.querySelectorAll(".mu-plain-text"))
-      .find((element) => element.textContent?.includes("MarkText WYSIWYG"));
-    const textNode = target?.firstChild;
-    if (!(textNode instanceof Text)) throw new Error("Font selection text node was not found");
-    const start = textNode.textContent?.indexOf("MarkText WYSIWYG") ?? -1;
-    if (start < 0) throw new Error("Font selection text was not found");
-    const range = document.createRange();
-    range.setStart(textNode, start);
-    range.setEnd(textNode, start + "MarkText WYSIWYG".length);
-    const selection = window.getSelection();
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-    target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-  });
-  await page.locator('select[aria-label="文字字号"]').selectOption("24px");
-  await page.getByRole("button", { name: "应用字体" }).click();
-  await page.getByText("已应用字体：24px / system", { exact: true }).waitFor();
+  assert.equal(await page.locator(".muya-font-toolbar").count(), 0);
 
   const paragraph = page.locator(".mu-paragraph-content").first();
   await paragraph.click();
@@ -56,7 +39,6 @@ try {
 
   const saved = await readFile(testFile, "utf8");
   assert.match(saved, /Markdown E2E save test/);
-  assert.match(saved, /<span style="font-size: 24px;/);
   assert.match(saved, /!\[本地图片\]\(images\/test\.png\)/);
   assert.match(saved, /!\[本地图片二\]\(images\/test2\.png\)/);
   assert.match(saved, /!\[本地图片三\]\(images\/test3\.png\)/);
@@ -67,9 +49,6 @@ try {
   await page.locator('[data-testid="muya-markdown-editor"]').waitFor();
   assert.match(await page.locator('[data-testid="muya-markdown-editor"]').innerText(), /Markdown E2E save test/);
   assert.equal(await page.locator(".muya-markdown-host img").count(), 3);
-  assert.equal(await page.locator(".mu-inline-rule.mu-raw-html").first().evaluate(
-    (element) => getComputedStyle(element).fontSize,
-  ), "24px");
 
   assert.deepEqual(pageErrors, [], `page errors: ${pageErrors.join("; ")}`);
 
