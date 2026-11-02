@@ -551,48 +551,6 @@ export function MuyaMarkdownEditor({
       item.appendChild(control);
       list.appendChild(item);
     };
-    const createFontSelect = (
-      row: HTMLElement,
-      labelText: string,
-      className: string,
-      property: "font-size" | "font-family",
-      placeholder: string,
-      options: Array<{ label: string; value: string }>,
-    ) => {
-      const label = document.createElement("label");
-      label.className = `mu-viewer-font-control ${className}`;
-      const caption = document.createElement("span");
-      caption.textContent = labelText;
-      const select = document.createElement("select");
-      select.setAttribute("aria-label", labelText);
-      const emptyOption = document.createElement("option");
-      emptyOption.value = "";
-      emptyOption.textContent = placeholder;
-      select.appendChild(emptyOption);
-      for (const option of options) {
-        const element = document.createElement("option");
-        element.value = option.value;
-        element.textContent = option.label;
-        select.appendChild(element);
-      }
-      select.addEventListener("change", () => {
-        if (!editor || !select.value) return;
-        const value = property === "font-family"
-          ? {
-            system: "'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI', sans-serif",
-            serif: "'Noto Serif SC', 'Songti SC', Georgia, serif",
-            mono: "'Cascadia Code', 'JetBrains Mono', Consolas, monospace",
-          }[select.value] ?? select.value
-          : select.value;
-        applyInlineStyleToSelection(
-          editor,
-          { [property]: value },
-          selectionSnapshotRef.current,
-        );
-      });
-      label.append(caption, select);
-      row.appendChild(label);
-    };
     const decorateFormatToolbar = () => {
       if (!editor) return;
       const picker = Array.from(
@@ -619,32 +577,6 @@ export function MuyaMarkdownEditor({
           "background-color",
           "#fff176",
         );
-      }
-      if (!picker.querySelector(".mu-viewer-font-controls")) {
-        const row = document.createElement("div");
-        row.className = "mu-viewer-font-controls";
-        createFontSelect(
-          row,
-          "字号",
-          "mu-viewer-font-size",
-          "font-size",
-          "默认",
-          ["12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px"]
-            .map((value) => ({ label: value.replace("px", ""), value })),
-        );
-        createFontSelect(
-          row,
-          "字体",
-          "mu-viewer-font-family",
-          "font-family",
-          "默认",
-          [
-            { label: "系统字体", value: "system" },
-            { label: "衬线字体", value: "serif" },
-            { label: "等宽字体", value: "mono" },
-          ],
-        );
-        picker.appendChild(row);
       }
     };
 
