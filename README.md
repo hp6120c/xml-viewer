@@ -19,7 +19,7 @@
 - Markdown 默认使用所见即所得编辑，也可切换到 Markdown 源码模式；基于 MarkText 的 Muya 内核，支持 GFM 表格、任务列表、脚注、代码高亮、数学公式、Mermaid 和 YAML Front Matter
 - Markdown 标题大纲、未保存保护、原编码/BOM/换行风格保留和原子写回
 - Markdown 相对图片安全加载，仅允许读取当前 Markdown 文件目录内的资源
-- 选中文字可使用 MarkText 的粗体、斜体、下划线、删除线、高亮、文字颜色、背景颜色、链接、行内代码和清除格式工具
+- 选中文字可使用 MarkText 原生的粗体、斜体、下划线、删除线、高亮、链接、行内代码和清除格式工具
 - 新建 Markdown / XML 文件、全屏标签阅读、Markdown 基础阅读样式
 - Markdown 基础样式可单独调整左侧大纲的字体、字号和字重
 - 自适应窗口布局、缩放、标签页右键菜单

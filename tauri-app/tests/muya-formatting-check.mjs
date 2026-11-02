@@ -66,7 +66,25 @@ try {
   const text = "支持 XML 数据库设计和 Markdown 文档阅读、编辑的桌面工具。";
   await selectText(text);
   assert.equal(await page.locator(".mu-format-picker:visible li.item.strong").count(), 1);
-  assert.equal(await page.locator(".mu-format-picker:visible li.item").count(), 12);
+  assert.equal(await page.locator(".mu-format-picker:visible li.item").count(), 10);
+  for (const format of [
+    "strong",
+    "em",
+    "u",
+    "del",
+    "mark",
+    "inline_code",
+    "inline_math",
+    "link",
+    "image",
+    "clear",
+  ]) {
+    assert.equal(
+      await page.locator(`.mu-format-picker:visible li.item.${format}`).count(),
+      1,
+      `native formatting item is missing: ${format}`,
+    );
+  }
 
   await clickFormat("strong");
   assert.match(await paragraphHtml(text), /<strong\b/);
@@ -88,47 +106,40 @@ try {
   assert.match(await paragraphHtml(text), /<strong\b/);
   await clickFormat("strong");
   assert.doesNotMatch(await paragraphHtml(text), /<strong\b/);
+
+  await clickFormat("del");
+  assert.match(await paragraphHtml(text), /<(?:del|s)\b/);
+  await clickFormat("del");
+  assert.doesNotMatch(await paragraphHtml(text), /<(?:del|s)\b/);
+
+  await clickFormat("inline_code");
+  assert.match(await paragraphHtml(text), /<code\b/);
+  await clickFormat("inline_code");
+  assert.doesNotMatch(await paragraphHtml(text), /<code\b/);
   assert.equal(await page.locator(".muya-font-toolbar").count(), 0);
 
   await selectText(text);
-  assert.equal(await page.locator(".mu-viewer-color-item").count(), 2);
   const toolbarScreenshot = path.join(outputDir, "muya-format-toolbar-1440x900.png");
   await page.screenshot({ path: toolbarScreenshot, fullPage: true });
-  await page.locator('.mu-viewer-text-color input[type="color"]').evaluate((input, value) => {
-    input.value = value;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-  }, "#c62828");
-  await page.waitForFunction(() => {
-    const element = document.querySelector(".mu-paragraph-content .mu-raw-html");
-    return element?.getAttribute("style")?.includes("color:") === true;
-  });
-  assert.match(await paragraphHtml(text), /color:\s*(?:#c62828|rgb\(198,\s*40,\s*40\))/i);
-
-  await selectText(text);
-  await page.locator('.mu-viewer-background-color input[type="color"]').evaluate((input, value) => {
-    input.value = value;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-  }, "#fff176");
-  await page.waitForTimeout(150);
-  const colorHtml = await paragraphHtml(text);
-  assert.match(colorHtml, /background-color:\s*(?:#fff176|rgb\(255,\s*241,\s*118\))/i);
-  assert.match(colorHtml, /color:\s*(?:#c62828|rgb\(198,\s*40,\s*40\))/i);
-
-  await selectText(text);
-  await clickFormat("clear");
-  const colorCleared = await paragraphHtml(text);
-  assert.doesNotMatch(colorCleared, /color:|background-color:|mu-raw-html/);
+  assert.equal(await page.locator(".mu-viewer-color-item").count(), 0);
   assert.equal(await page.locator(".mu-viewer-font-controls").count(), 0);
 
   assert.deepEqual(pageErrors, [], `page errors: ${pageErrors.join("; ")}`);
   console.log(JSON.stringify({
     ok: true,
-    formats: ["strong", "em", "u", "mark", "clear", "strong-toggle", "text-color", "background-color"],
+    formats: [
+      "strong",
+      "em",
+      "u",
+      "del",
+      "mark",
+      "inline_code",
+      "clear",
+      "strong-toggle",
+      "del-toggle",
+      "inline-code-toggle",
+    ],
     clearedHtml: cleared,
-    colorHtml,
-    colorCleared,
     toolbarScreenshot,
   }, null, 2));
 } finally {
