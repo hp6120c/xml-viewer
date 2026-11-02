@@ -44,8 +44,6 @@ interface PreparedMarkdown {
   restore: (value: string) => string;
 }
 
-type MuyaSelection = NonNullable<ReturnType<Muya["editor"]["selection"]["getSelection"]>>;
-
 let pluginsRegistered = false;
 let markdownLinkHandler: ((href: string) => void) | null = null;
 const MARKDOWN_IMAGE_SOURCE_PATTERN = /(!\[[^\]]*\]\(\s*)(<[^>\r\n]+>|[^\s)]+)/g;
@@ -312,100 +310,6 @@ function clearHtmlFormattingAroundSelection(
   return true;
 }
 
-function wrapSelectedTextWithStyle(
-  selected: string,
-  declarations: Record<string, string>,
-): string | null {
-  let prefix = "";
-  let suffix = "";
-  let inner = selected;
-  for (const marker of ["***", "___", "**", "__", "~~", "*", "_"]) {
-    if (
-      inner.startsWith(marker)
-      && inner.endsWith(marker)
-      && inner.length > marker.length * 2
-    ) {
-      prefix = marker;
-      suffix = marker;
-      inner = inner.slice(marker.length, -marker.length);
-      break;
-    }
-  }
-
-  if (/[`*_~]/.test(inner)) return null;
-  const style = Object.entries(declarations)
-    .map(([property, value]) => `${property}: ${value}`)
-    .join("; ");
-  const styled = `<span style="${style}">${inner}</span>`;
-  if (prefix) return `${prefix}${styled}${suffix}`;
-
-  const htmlPair = /^<(strong|b|em|i|u|mark|del|s|sub|sup)(\s[^>]*)?>([\s\S]*)<\/\1>$/i.exec(selected);
-  if (htmlPair) {
-    return `<${htmlPair[1]}${htmlPair[2] ?? ""}><span style="${style}">${htmlPair[3]}</span></${htmlPair[1]}>`;
-  }
-  const existingSpan = /^<span\b([^>]*)>([\s\S]*)<\/span>$/i.exec(selected);
-  if (existingSpan) {
-    const existingStyle = /\sstyle=(?:"([^"]*)"|'([^']*)')/i.exec(existingSpan[1]);
-    const attrs = existingSpan[1].replace(/\sstyle=(?:"[^"]*"|'[^']*')/i, "");
-    const mergedStyle = [
-      existingStyle?.[1] ?? existingStyle?.[2] ?? "",
-      style,
-    ].filter(Boolean).join("; ").replace(/"/g, "&quot;");
-    return `<span${attrs} style="${mergedStyle}">${existingSpan[2]}</span>`;
-  }
-  return styled;
-}
-
-function applyInlineStyleToSelection(
-  editor: Muya,
-  declarations: Record<string, string>,
-  fallback: MuyaSelection | null,
-): boolean {
-  const current = editor.editor.selection.getSelection();
-  const selection = current && !current.isCollapsed ? current : fallback;
-  if (
-    !selection
-    || selection.isCollapsed
-    || !selection.isSelectionInSameBlock
-  ) {
-    return false;
-  }
-
-  const block = selection.anchorBlock;
-  const start = Math.min(selection.anchor.offset, selection.focus.offset);
-  const end = Math.max(selection.anchor.offset, selection.focus.offset);
-  if (start === end || start < 0 || end > block.text.length) return false;
-
-  const selected = block.text.slice(start, end);
-  const before = block.text.slice(0, start);
-  const after = block.text.slice(end);
-  const openingSpan = /(<span\b[^>]*>)[ \t]*$/.exec(before);
-  const closingSpan = /^[ \t]*<\/span>/.exec(after);
-  if (openingSpan && closingSpan) {
-    const attrs = /^<span\b([^>]*)>$/.exec(openingSpan[1])?.[1] ?? "";
-    const existingStyle = /\sstyle=(?:"([^"]*)"|'([^']*)')/i.exec(attrs);
-    const attrsWithoutStyle = attrs.replace(/\sstyle=(?:"[^"]*"|'[^']*')/i, "");
-    const style = [
-      existingStyle?.[1] ?? existingStyle?.[2] ?? "",
-      ...Object.entries(declarations).map(([property, value]) => `${property}: ${value}`),
-    ].filter(Boolean).join("; ").replace(/"/g, "&quot;");
-    const replacement = `<span${attrsWithoutStyle} style="${style}">${selected}</span>`;
-    const nextStart = start - openingSpan[0].length;
-    block.text = `${block.text.slice(0, nextStart)}${replacement}${block.text.slice(end + closingSpan[0].length)}`;
-    const selectedStart = nextStart + replacement.indexOf(selected);
-    block.setCursor(selectedStart, selectedStart + selected.length, true);
-    return true;
-  }
-
-  const replacement = wrapSelectedTextWithStyle(selected, declarations);
-  if (!replacement) return false;
-  block.text = `${block.text.slice(0, start)}${replacement}${block.text.slice(end)}`;
-  const selectedStart = replacement.indexOf(selected);
-  const selectionStart = start + (selectedStart >= 0 ? selectedStart : 0);
-  block.setCursor(selectionStart, selectionStart + selected.length, true);
-  return true;
-}
-
 export function MuyaMarkdownEditor({
   source,
   currentPath,
@@ -425,7 +329,6 @@ export function MuyaMarkdownEditor({
   const openLocalPathRef = useRef(onOpenLocalPath);
   const imageCacheRef = useRef(new Map<string, string>());
   const imageHydrationFrameRef = useRef<number | null>(null);
-  const selectionSnapshotRef = useRef<MuyaSelection | null>(null);
   sourceRef.current = source;
   onChangeRef.current = onChange;
   currentPathRef.current = currentPath;
@@ -460,20 +363,13 @@ export function MuyaMarkdownEditor({
       if (
         !editor
         || !(target instanceof Element)
-        || !target.closest(".mu-format-picker")
+        || !target.closest(".mu-format-picker li.item")
       ) {
         pendingFormatSelection = null;
         return;
       }
       const selection = editor.editor.selection.getSelection();
-      selectionSnapshotRef.current = selection && !selection.isCollapsed ? selection : null;
-      const formatItem = target.closest(".mu-format-picker li.item");
-      if (
-        !formatItem
-        || !selection
-        || selection.isCollapsed
-        || !selection.isSelectionInSameBlock
-      ) {
+      if (!selection || selection.isCollapsed || !selection.isSelectionInSameBlock) {
         pendingFormatSelection = null;
         return;
       }
@@ -486,7 +382,7 @@ export function MuyaMarkdownEditor({
           block,
           start,
           text: selectedText,
-          clear: Boolean(formatItem.classList.contains("clear")),
+          clear: Boolean(target.closest(".mu-format-picker li.item.clear")),
         }
         : null;
     };
@@ -509,77 +405,8 @@ export function MuyaMarkdownEditor({
         if (nextStart >= 0) {
           pending.block.setCursor(nextStart, nextStart + pending.text.length, true);
         }
-        window.requestAnimationFrame(decorateFormatToolbar);
       });
     };
-    const createColorControl = (
-      list: HTMLUListElement,
-      className: string,
-      title: string,
-      iconText: string,
-      property: "color" | "background-color",
-      initialValue: string,
-    ) => {
-      const item = document.createElement("li");
-      item.className = `item mu-viewer-color-item ${className}`;
-      item.title = title;
-      const control = document.createElement("label");
-      control.className = "mu-viewer-color-control";
-      const icon = document.createElement("span");
-      icon.className = "mu-viewer-color-icon";
-      icon.textContent = iconText;
-      const input = document.createElement("input");
-      input.type = "color";
-      input.value = initialValue;
-      input.title = title;
-      input.setAttribute("aria-label", title);
-      const updateIcon = () => {
-        if (property === "color") icon.style.borderBottomColor = input.value;
-        else icon.style.color = input.value;
-      };
-      updateIcon();
-      input.addEventListener("input", updateIcon);
-      input.addEventListener("change", () => {
-        if (!editor) return;
-        applyInlineStyleToSelection(
-          editor,
-          { [property]: input.value },
-          selectionSnapshotRef.current,
-        );
-      });
-      control.append(icon, input);
-      item.appendChild(control);
-      list.appendChild(item);
-    };
-    const decorateFormatToolbar = () => {
-      if (!editor) return;
-      const picker = Array.from(
-        document.querySelectorAll<HTMLElement>(".mu-format-picker"),
-      ).find((element) => element.querySelector("ul"));
-      if (!picker) return;
-      const list = picker.querySelector<HTMLUListElement>("ul");
-      if (!list) return;
-      picker.classList.add("mu-viewer-has-color-tools");
-      if (!list.querySelector(".mu-viewer-color-item")) {
-        createColorControl(
-          list,
-          "mu-viewer-text-color",
-          "文字颜色",
-          "A",
-          "color",
-          "#d32f2f",
-        );
-        createColorControl(
-          list,
-          "mu-viewer-background-color",
-          "文字背景颜色",
-          "▰",
-          "background-color",
-          "#fff176",
-        );
-      }
-    };
-
     void (async () => {
       const initialSource = sourceRef.current;
       const initialPath = currentPathRef.current;
@@ -607,11 +434,6 @@ export function MuyaMarkdownEditor({
       lastMarkdownRef.current = initialSource;
       lastPreparedPathRef.current = initialPath;
       editor.locale(zh);
-      editor.on("muya-format-picker", () => {
-        window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(decorateFormatToolbar);
-        });
-      });
       editor.on("json-change", () => {
         if (!editor) return;
         const next = restoreMarkdownRef.current(editor.getMarkdown());
@@ -679,7 +501,6 @@ export function MuyaMarkdownEditor({
     const revision = ++sourceRevisionRef.current;
     if (currentPath !== lastPreparedPathRef.current) imageCacheRef.current.clear();
     lastMarkdownRef.current = source;
-    selectionSnapshotRef.current = null;
     void prepareMarkdownSource(source, currentPath, imageCacheRef.current).then((prepared) => {
       if (
         revision !== sourceRevisionRef.current

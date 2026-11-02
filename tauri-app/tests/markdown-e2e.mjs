@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { connectTauriPage, fixturePath, openFixtureSession } from "./e2e-utils.mjs";
 
 const testFile = process.env.MD_E2E_FILE;
 assert(testFile, "MD_E2E_FILE is required");
 const testFileName = testFile.split(/[\\/]/).pop();
 assert(testFileName, "MD_E2E_FILE must include a file name");
+
+const baseline = (await readFile(testFile, "utf8"))
+  .replace(/ Markdown E2E save test\./g, "")
+  .replace(/\n*Source mode save verified\.\s*/g, "\n");
+await writeFile(testFile, baseline, "utf8");
 
 const { browser, page } = await connectTauriPage();
 const pageErrors = [];
@@ -27,40 +32,6 @@ try {
   assert.ok(tabText.includes(testFileName));
   assert.equal(await page.locator(".muya-font-toolbar").count(), 0);
 
-  const selectColoredText = async () => {
-    await page.evaluate(() => {
-      const target = Array.from(document.querySelectorAll(".mu-plain-text"))
-        .find((element) => element.textContent?.includes("MarkText WYSIWYG"));
-      const textNode = target?.firstChild;
-      if (!(textNode instanceof Text)) throw new Error("Color selection text node was not found");
-      const start = textNode.textContent?.indexOf("MarkText WYSIWYG") ?? -1;
-      if (start < 0) throw new Error("Color selection text was not found");
-      const range = document.createRange();
-      range.setStart(textNode, start);
-      range.setEnd(textNode, start + "MarkText WYSIWYG".length);
-      const selection = window.getSelection();
-      selection?.removeAllRanges();
-      selection?.addRange(range);
-      target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-      target.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true, key: "Shift" }));
-    });
-    await page.locator(".mu-viewer-color-item").first().waitFor();
-  };
-
-  await selectColoredText();
-  await page.locator('.mu-viewer-text-color input[type="color"]').evaluate((input, value) => {
-    input.value = value;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-  }, "#c62828");
-  await selectColoredText();
-  await page.locator('.mu-viewer-background-color input[type="color"]').evaluate((input, value) => {
-    input.value = value;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-  }, "#fff176");
-  await page.waitForTimeout(150);
-
   const paragraph = page.locator(".mu-paragraph-content").first();
   await paragraph.click();
   await page.waitForTimeout(150);
@@ -72,8 +43,6 @@ try {
   const sourceEditor = page.locator('[data-testid="markdown-source-editor"] .cm-content');
   const sourceText = await sourceEditor.innerText();
   assert.match(sourceText, /Markdown E2E save test/);
-  assert.match(sourceText, /color: #c62828/);
-  assert.match(sourceText, /background-color: #fff176/);
   await sourceEditor.click();
   await page.keyboard.press("Control+End");
   await page.keyboard.insertText("\n\nSource mode save verified.");
@@ -84,8 +53,6 @@ try {
   const saved = await readFile(testFile, "utf8");
   assert.match(saved, /Markdown E2E save test/);
   assert.match(saved, /Source mode save verified/);
-  assert.match(saved, /color:\s*#c62828/i);
-  assert.match(saved, /background-color:\s*#fff176/i);
   assert.match(saved, /!\[本地图片\]\(images\/test\.png\)/);
   assert.match(saved, /!\[本地图片二\]\(images\/test2\.png\)/);
   assert.match(saved, /!\[本地图片三\]\(images\/test3\.png\)/);
@@ -102,14 +69,6 @@ try {
   await page.getByText(/Markdown E2E save test/).waitFor({ timeout: 10000 });
   assert.match(await page.locator('[data-testid="muya-markdown-editor"]').innerText(), /Markdown E2E save test/);
   assert.equal(await page.locator(".muya-markdown-host img").count(), 3);
-  const reloadedStyle = await page.locator(".mu-inline-rule.mu-raw-html").first().evaluate(
-    (element) => ({
-      color: getComputedStyle(element).color,
-      backgroundColor: getComputedStyle(element).backgroundColor,
-    }),
-  );
-  assert.equal(reloadedStyle.color, "rgb(198, 40, 40)");
-  assert.equal(reloadedStyle.backgroundColor, "rgb(255, 241, 118)");
 
   assert.deepEqual(pageErrors, [], `page errors: ${pageErrors.join("; ")}`);
 
