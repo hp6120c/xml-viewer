@@ -1,0 +1,140 @@
+.muya-markdown-shell {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--editor-color, #30465b);
+  background: var(--editor-bg-color, #fff);
+}
+
+.muya-font-toolbar {
+  min-height: 40px;
+  flex: 0 0 40px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border-bottom: 1px solid #dce6ef;
+  background: #f8fbfd;
+  color: #5e7488;
+  font-size: 11px;
+}
+
+.muya-font-toolbar-label {
+  color: #39556e;
+  font-weight: 600;
+}
+
+.muya-font-toolbar select {
+  height: 27px;
+  padding: 0 6px;
+  border: 1px solid #cfdce8;
+  border-radius: 5px;
+  color: #3e5870;
+  background: #fff;
+  font-size: 11px;
+}
+
+.muya-font-toolbar button {
+  height: 27px;
+  padding: 0 9px;
+  border: 1px solid #1973c7;
+  border-radius: 5px;
+  color: #fff;
+  background: #1973c7;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.muya-font-toolbar button:hover {
+  background: #1266b0;
+}
+
+.muya-font-toolbar-hint {
+  margin-left: 4px;
+  color: #93a4b3;
+  font-size: 10px;
+}
+
+.muya-markdown-host {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: var(--editor-bg-color, #fff);
+  font-size: var(--md-font-size, 16px);
+  line-height: var(--md-line-height, 1.75);
+}
+
+.muya-markdown-host .muya {
+  min-height: 100%;
+}
+
+.muya-editor-mount {
+  min-height: 100%;
+}
+
+.muya-markdown-host .mu-container {
+  max-width: var(--md-width, none);
+  padding: 0 var(--md-padding-x, 48px) 100px;
+  font-family: var(--md-font-family);
+  line-height: var(--md-line-height, 1.75);
+}
+
+.muya-markdown-host .mu-container p {
+  padding-block: calc(var(--md-paragraph-gap, 1) * 0.5em);
+}
+
+.muya-markdown-host .mu-code-block,
+.muya-markdown-host .mu-frontmatter,
+.muya-markdown-host .mu-html-container,
+.muya-markdown-host .mu-math-container,
+.muya-markdown-host .mu-diagram-container {
+  background: var(--code-block-bg-color, var(--md-code-bg, #f7fafc));
+  font-size: var(--md-code-font-size, 13px);
+}
+
+.muya-markdown-host img {
+  border-radius: var(--md-image-radius, 7px);
+}
+
+.muya-markdown-host .muya-editor {
+  min-height: 100%;
+}
+
+/* Muya keeps raw HTML tag tokens visible in the editable DOM. Hide only the
+   tag syntax and let the styled inline rule render as its WYSIWYG result. */
+.muya-markdown-host .mu-html-tag.mu-output-remove {
+  display: none;
+}
+
+.muya-loading {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: #6f8396;
+  background: #fff;
+  font-size: 13px;
+}
+
+@media (max-width: 800px) {
+  .muya-font-toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 40px;
+    padding-block: 6px;
+  }
+
+  .muya-font-toolbar-hint {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .muya-markdown-host .mu-container {
+    padding-inline: min(var(--md-padding-x, 28px), 28px);
+  }
+}

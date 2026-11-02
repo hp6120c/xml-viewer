@@ -1,6 +1,8 @@
 import { createPortal } from "react-dom";
 
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -48,13 +50,9 @@ import { XmlEditor } from "./components/XmlEditor";
 
 import { GenericXmlView } from "./components/GenericXmlView";
 
-import { MarkdownEditor } from "./components/MarkdownEditor";
-
 import { MarkdownOutline } from "./components/MarkdownOutline";
 
 import { MarkdownSettingsPanel } from "./components/MarkdownSettingsPanel";
-
-import { MarkdownView } from "./components/MarkdownView";
 
 import {
   chooseFolder,
@@ -94,6 +92,12 @@ import {
   saveMarkdownSettings,
 } from "./lib/markdown-settings";
 import type { OpenedDocument, TableInfo } from "./types";
+
+const MuyaMarkdownEditor = lazy(() =>
+  import("./components/MuyaMarkdownEditor").then((module) => ({
+    default: module.MuyaMarkdownEditor,
+  })),
+);
 
 type ViewMode = "overview" | "detail" | "edit" | "markdown-read" | "markdown-edit";
 type ToastState = { kind: "success" | "error" | "info"; message: string } | null;
@@ -180,6 +184,8 @@ function App() {
   const updateCheckingRef = useRef(false);
   const autoUpdateCheckedRef = useRef(false);
   const resizingSidebarRef = useRef(false);
+  const markdownBaselineRef = useRef("");
+  const markdownSourceRef = useRef("");
 
   const activeDocument = useMemo(
     () => documents.find((document) => document.path === activePath) ?? null,
@@ -306,6 +312,21 @@ function App() {
     setDirty(false);
   }, []);
 
+  const restoreMarkdownBaseline = useCallback((path = activePath) => {
+    if (!path) return;
+    const baseline = markdownBaselineRef.current;
+    setDocuments((current) => current.map((document) =>
+      document.path === path && document.kind === "markdown"
+        ? { ...document, source: baseline }
+        : document,
+    ));
+    setEditorContent(baseline);
+    markdownSourceRef.current = baseline;
+    editorRevisionRef.current = 0;
+    dirtyRef.current = false;
+    setDirty(false);
+  }, [activePath]);
+
   const replaceDocument = useCallback((nextDocument: OpenedDocument) => {
     setDocuments((current) =>
       current.map((document) => (document.path === nextDocument.path ? nextDocument : document)),
@@ -320,6 +341,7 @@ function App() {
     if (dirtyRef.current) {
       const discard = await askDiscard("打开其他文件会放弃当前文档尚未保存的修改，是否继续？");
       if (!discard) return false;
+      if (activeDocument?.kind === "markdown") restoreMarkdownBaseline(activeDocument.path);
     }
 
     setBusy(`正在读取 ${unique.length} 个文件...`);
@@ -353,6 +375,11 @@ function App() {
       setActivePath(destination.path);
       setSearch("");
       resetWorkspaceView(destination.kind === "markdown");
+      if (destination.kind === "markdown") {
+        markdownBaselineRef.current = destination.source;
+        markdownSourceRef.current = destination.source;
+        setEditorContent(destination.source);
+      }
     }
 
     if (errors.length > 0) {
@@ -363,7 +390,7 @@ function App() {
     }
     setBusy(null);
     return loaded.length > 0;
-  }, [resetWorkspaceView]);
+  }, [activeDocument, resetWorkspaceView, restoreMarkdownBaseline]);
 
   const loadPathsRef = useRef(loadPaths);
   loadPathsRef.current = loadPaths;
@@ -558,23 +585,6 @@ function App() {
     }
   }, [activeDocument, dirty, editingTableId, editingTableIndex, editorContent, replaceDocument]);
 
-  const enterMarkdownEdit = useCallback(async () => {
-    if (!activeDocument || activeDocument.kind !== "markdown") return;
-    if (mode === "markdown-edit") return;
-    const preservePreviewStyles = mode === "markdown-read" && dirtyRef.current;
-    if (dirtyRef.current && !preservePreviewStyles) {
-      const discard = await askDiscard("进入 Markdown 编辑会放弃当前尚未保存的修改，是否继续？");
-      if (!discard) return;
-    }
-    setEditorContent(activeDocument.source.replace(/\r\n/g, "\n"));
-    setEditorEncoding(activeDocument.encoding);
-    if (!preservePreviewStyles) {
-      editorRevisionRef.current = 0;
-      setDirty(false);
-    }
-    setMode("markdown-edit");
-  }, [activeDocument, mode]);
-
   const saveMarkdownEdit = useCallback(async (exitAfterSave: boolean): Promise<boolean> => {
     if (!activeDocument || activeDocument.kind !== "markdown") return false;
     if (!dirty) {
@@ -582,21 +592,43 @@ function App() {
       return true;
     }
     const sessionId = editRequestRef.current;
-    const savedRevision = editorRevisionRef.current;
     setBusy("正在保存 Markdown 文档...");
     try {
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+      });
+      const sourceToSave = markdownSourceRef.current || editorContent;
+      const savedRevision = editorRevisionRef.current;
       const nextDocument = await saveMarkdownFile(
         activeDocument.path,
-        editorContent,
+        sourceToSave,
         activeDocument.contentHash,
       );
-      replaceDocument(nextDocument);
+      const changedDuringSave = editorRevisionRef.current !== savedRevision;
+      setDocuments((current) => current.map((document) => {
+        if (document.path !== activeDocument.path || document.kind !== "markdown") return document;
+        if (!changedDuringSave) return nextDocument;
+        return {
+          ...document,
+          contentHash: nextDocument.contentHash,
+          fileSize: nextDocument.fileSize,
+          encoding: nextDocument.encoding,
+        };
+      }));
+      markdownBaselineRef.current = nextDocument.source;
+      markdownSourceRef.current = changedDuringSave
+        ? markdownSourceRef.current
+        : nextDocument.source;
       if (sessionId !== editRequestRef.current) return true;
-      if (editorRevisionRef.current !== savedRevision) {
+      if (changedDuringSave) {
+        editorRevisionRef.current = 0;
+        dirtyRef.current = true;
         setDirty(true);
         setToast({ kind: "error", message: "保存期间内容又发生了变化，磁盘已保存到上一次快照，请再次保存" });
         return false;
       }
+      editorRevisionRef.current = 0;
+      dirtyRef.current = false;
       setDirty(false);
       setToast({ kind: "success", message: "Markdown 文档已保存" });
       if (exitAfterSave) setMode("markdown-read");
@@ -609,19 +641,20 @@ function App() {
     } finally {
       if (sessionId === editRequestRef.current) setBusy(null);
     }
-  }, [activeDocument, dirty, editorContent, replaceDocument]);
+  }, [activeDocument, dirty, editorContent]);
 
-  const applyMarkdownLocalStyle = useCallback((nextSource: string) => {
+  const handleMuyaMarkdownChange = useCallback((nextSource: string) => {
     if (!activeDocument || activeDocument.kind !== "markdown") return;
     setEditorContent(nextSource);
+    markdownSourceRef.current = nextSource;
     editorRevisionRef.current += 1;
+    dirtyRef.current = true;
     setDirty(true);
     setDocuments((current) => current.map((document) =>
       document.path === activeDocument.path && document.kind === "markdown"
         ? { ...document, source: nextSource }
         : document,
     ));
-    setToast({ kind: "info", message: "局部样式已应用，按 Ctrl+S 或点击“保存更改”写入 Markdown" });
   }, [activeDocument]);
 
   const cancelEdit = useCallback(async () => {
@@ -632,9 +665,13 @@ function App() {
       if (!discard) return;
     }
     editRequestRef.current += 1;
-    setDirty(false);
+    if (activeDocument?.kind === "markdown") restoreMarkdownBaseline(activeDocument.path);
+    else {
+      dirtyRef.current = false;
+      setDirty(false);
+    }
     setMode(activeDocument?.kind === "markdown" ? "markdown-read" : (activeTable ? "detail" : "overview"));
-  }, [activeDocument, activeTable, dirty]);
+  }, [activeDocument, activeTable, dirty, restoreMarkdownBaseline]);
 
   const selectTable = useCallback(async (table: TableInfo) => {
     if (mode === "edit") {
@@ -649,21 +686,32 @@ function App() {
     if (dirty) {
       const discard = await askDiscard("切换标签页会放弃当前尚未保存的修改，是否继续？");
       if (!discard) return;
-      dirtyRef.current = false;
-      setDirty(false);
+      if (activeDocument?.kind === "markdown") restoreMarkdownBaseline(activeDocument.path);
+      else {
+        dirtyRef.current = false;
+        setDirty(false);
+      }
     }
     setActivePath(path);
     const next = documentsRef.current.find((document) => document.path === path);
     resetWorkspaceView(next?.kind === "markdown");
-  }, [activePath, dirty, resetWorkspaceView]);
+    if (next?.kind === "markdown") {
+      markdownBaselineRef.current = next.source;
+      markdownSourceRef.current = next.source;
+      setEditorContent(next.source);
+    }
+  }, [activeDocument, activePath, dirty, resetWorkspaceView, restoreMarkdownBaseline]);
 
   const closePaths = useCallback(async (pathsToClose: string[]) => {
     const unique = new Set(pathsToClose);
     if (unique.has(activePath ?? "") && dirty) {
       const discard = await askDiscard("关闭当前标签页会放弃尚未保存的修改，是否继续？");
       if (!discard) return;
-      dirtyRef.current = false;
-      setDirty(false);
+      if (activeDocument?.kind === "markdown") restoreMarkdownBaseline(activeDocument.path);
+      else {
+        dirtyRef.current = false;
+        setDirty(false);
+      }
     }
     const currentPaths = documentsRef.current.map((document) => document.path);
     const remaining = currentPaths.filter((path) => !unique.has(path));
@@ -675,9 +723,14 @@ function App() {
       setActivePath(nextPath);
       const next = remainingDocuments.find((document) => document.path === nextPath);
       resetWorkspaceView(next?.kind === "markdown");
+      if (next?.kind === "markdown") {
+        markdownBaselineRef.current = next.source;
+        markdownSourceRef.current = next.source;
+        setEditorContent(next.source);
+      }
     }
     setTabMenu(null);
-  }, [activePath, dirty, resetWorkspaceView]);
+  }, [activeDocument, activePath, dirty, resetWorkspaceView, restoreMarkdownBaseline]);
 
   const openFiles = useCallback(async () => {
     try {
@@ -780,6 +833,10 @@ function App() {
       const nextDocument = await loadDocument(activeDocument.path);
       replaceDocument(nextDocument);
       if (nextDocument.kind === "markdown") {
+        markdownBaselineRef.current = nextDocument.source;
+        markdownSourceRef.current = nextDocument.source;
+        setEditorContent(nextDocument.source);
+        editorRevisionRef.current = 0;
         if (mode === "markdown-edit") setMode("markdown-read");
       } else if (selectedTableIndex !== null) {
         const exists = nextDocument.modules.some((module) =>
@@ -788,6 +845,7 @@ function App() {
         );
         setMode(mode === "edit" || !exists ? (exists ? "detail" : "overview") : mode);
       }
+      dirtyRef.current = false;
       setDirty(false);
       setToast({ kind: "success", message: "文件已刷新" });
     } catch (error) {
@@ -818,8 +876,7 @@ function App() {
       if (event.key.toLowerCase() === "e") {
         event.preventDefault();
         if (activeDocument?.kind === "markdown") {
-          if (mode === "markdown-edit") void saveMarkdownEdit(true);
-          else void enterMarkdownEdit();
+          return;
         } else if (mode === "edit") {
           void saveEdit(true);
         } else if (activeTable) {
@@ -834,7 +891,6 @@ function App() {
     activeTable,
     createNewDocument,
     enterEdit,
-    enterMarkdownEdit,
     isFullscreen,
     mode,
     saveEdit,
@@ -867,10 +923,12 @@ function App() {
             <h1>XML / Markdown 编辑器</h1>
             <span>
               {activeDocument?.kind === "markdown"
-                ? "Markdown 文档 · Tauri 2"
+                ? "Markdown 文档"
                 : activeDocument?.kind === "xml"
-                  ? "通用 XML 文档 · Tauri 2"
-                  : "SCL Schema XML · Tauri 2"}
+                  ? "通用 XML 文档"
+                  : "SCL Schema XML"}
+              {" · "}
+              <strong>Designed and developed by Austin.H</strong>
             </span>
           </div>
         </div>
@@ -912,40 +970,41 @@ function App() {
         <button type="button" className="tool-button" onClick={openFiles}>
           <FilePlus2 size={17} />打开文件
         </button>
-        <button type="button" className="tool-button" onClick={reloadCurrent} disabled={!activeDocument || mode === "edit" || mode === "markdown-edit"}>
+        <button type="button" className="tool-button" onClick={reloadCurrent} disabled={!activeDocument || mode === "edit"}>
           <RefreshCw size={17} />刷新
         </button>
-        <button
-          type="button"
-          className={`tool-button ${mode === "edit" || mode === "markdown-edit" ? "active" : ""}`}
-          onClick={() => {
-            if (activeDocument?.kind === "markdown") {
-              if (mode === "markdown-edit") void saveMarkdownEdit(true);
-              else if (dirtyRef.current) void saveMarkdownEdit(false);
-              else void enterMarkdownEdit();
-            } else if (mode === "edit") {
-              void saveEdit(true);
-            } else if (activeTable) {
-              void enterEdit(activeTable);
-            } else {
-              setToast({ kind: "info", message: "请先在左侧或目录中选择一张表" });
+        {activeDocument?.kind === "markdown" ? (
+          <button
+            type="button"
+            className="tool-button"
+            onClick={() => void saveMarkdownEdit(false)}
+            disabled={!dirty}
+          >
+            <Save size={17} />保存更改
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={`tool-button ${mode === "edit" ? "active" : ""}`}
+            onClick={() => {
+              if (mode === "edit") {
+                void saveEdit(true);
+              } else if (activeTable) {
+                void enterEdit(activeTable);
+              } else {
+                setToast({ kind: "info", message: "请先在左侧或目录中选择一张表" });
+              }
+            }}
+            disabled={
+              !activeDocument
+              || activeDocument.kind === "xml"
+              || (activeDocument.kind === "scl" && mode !== "edit" && !activeTable)
             }
-          }}
-          disabled={
-            !activeDocument
-            || activeDocument.kind === "xml"
-            || (activeDocument.kind === "scl" && mode !== "edit" && !activeTable)
-          }
-        >
-          {activeDocument?.kind === "markdown"
-            ? <FileText size={17} />
-            : <PencilLine size={17} />}
-          {mode === "edit" || mode === "markdown-edit"
-            ? "保存并阅读"
-            : activeDocument?.kind === "markdown" && dirty
-              ? "保存更改"
-              : "编辑模式"}
-        </button>
+          >
+            <PencilLine size={17} />
+            {mode === "edit" ? "保存并阅读" : "编辑模式"}
+          </button>
+        )}
 
         <label className="search-box">
           <Search size={16} />
@@ -972,8 +1031,7 @@ function App() {
             type="button"
             className="tool-button"
             onClick={() => setMarkdownSettingsOpen(true)}
-            disabled={mode === "markdown-edit"}
-            title={mode === "markdown-edit" ? "切回阅读模式后调整预览样式" : "调整 Markdown 阅读样式"}
+            title="调整 Markdown 阅读样式"
           >
             <SlidersHorizontal size={17} />基础样式
           </button>
@@ -1111,6 +1169,12 @@ function App() {
                 fileName={activeDocument.fileName}
                 search={search}
                 settings={markdownSettings}
+                onSelectHeading={(index) => {
+                  const heading = document.querySelectorAll<HTMLElement>(
+                    '[data-testid="content-pane"] .mu-atx-heading, [data-testid="content-pane"] .mu-setext-heading',
+                  )[index];
+                  heading?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
               />
               <div
                 className="sidebar-resizer"
@@ -1123,47 +1187,16 @@ function App() {
                 onPointerCancel={stopSidebarResize}
               />
               <section className="content-pane markdown-content-pane" data-testid="content-pane">
-                {mode === "markdown-edit" ? (
-                  <div className="markdown-edit-page" data-testid="markdown-edit-page">
-                    <div className="edit-heading">
-                      <div>
-                        <div className="eyebrow">Markdown 编辑器 · {editorEncoding}</div>
-                        <h1>{activeDocument.fileName}</h1>
-                        <p>{dirty ? "有未保存的修改" : "内容已与磁盘同步"}</p>
-                      </div>
-                      <div className="edit-actions">
-                        <button type="button" className="secondary-button" onClick={() => void cancelEdit()}>
-                          取消
-                        </button>
-                        <button type="button" className="secondary-button" onClick={() => void saveMarkdownEdit(false)} disabled={!dirty}>
-                          <Save size={16} />仅保存
-                        </button>
-                        <button type="button" className="primary-button" onClick={() => void saveMarkdownEdit(true)}>
-                          <CheckCircle2 size={16} />保存并阅读
-                        </button>
-                      </div>
-                    </div>
-                    <div className="editor-shell markdown-editor-shell">
-                      <MarkdownEditor
-                        value={editorContent}
-                        onChange={(value) => {
-                          setEditorContent(value);
-                          editorRevisionRef.current += 1;
-                          setDirty(true);
-                        }}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <MarkdownView
+                <Suspense fallback={<div className="muya-loading">正在加载 Markdown 编辑器...</div>}>
+                  <MuyaMarkdownEditor
                     source={activeDocument.source}
                     currentPath={activeDocument.path}
                     settings={markdownSettings}
-                    onLocalStyleChange={applyMarkdownLocalStyle}
-                    onLocalStyleError={(message) => setToast({ kind: "error", message })}
+                    onChange={handleMuyaMarkdownChange}
+                    onStatus={(message) => setToast({ kind: "info", message })}
                     onOpenLocalPath={(path) => void loadPaths([path])}
                   />
-                )}
+                </Suspense>
               </section>
             </>
           ) : activeDocument.kind === "xml" ? (

@@ -1,7 +1,7 @@
-import { chromium } from "playwright";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { connectTauriPage, openFixtureSession } from "./e2e-utils.mjs";
 
 const filePath = process.env.XML_VIEWER_E2E_FILE
   ? path.resolve(process.env.XML_VIEWER_E2E_FILE)
@@ -17,11 +17,8 @@ process.on("uncaughtException", (error) => {
   console.error(error);
   process.exit(1);
 });
-const browser = await chromium.connectOverCDP("http://127.0.0.1:9222");
-const pages = browser.contexts().flatMap((context) => context.pages());
-const page = pages.find((item) => item.url().includes("tauri.localhost"));
-if (!page) throw new Error("Tauri WebView page was not found over CDP");
-await page.reload({ waitUntil: "networkidle" });
+const { browser, page } = await connectTauriPage();
+await openFixtureSession(page, [filePath], filePath);
 
 await page.locator('[data-testid="overview-page"]').waitFor();
 if (!(await page.getByRole("button", { name: "GitHub" }).isVisible())) throw new Error("GitHub button missing");

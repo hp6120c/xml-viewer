@@ -35,7 +35,7 @@ export const DEFAULT_MARKDOWN_SETTINGS: MarkdownReadingSettings = {
   lineHeight: 1.78,
   paragraphGap: 1,
   codeFontSize: 13,
-  contentWidth: "comfortable",
+  contentWidth: "full",
   contentPadding: "standard",
   headingStyle: "modern",
   tableStyle: "striped",

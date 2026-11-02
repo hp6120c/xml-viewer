@@ -1,19 +1,19 @@
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { chromium } from "playwright";
+import { connectTauriPage, fixturePath, openFixtureSession } from "./e2e-utils.mjs";
 
-const cdpUrl = process.env.TAURI_CDP_URL ?? "http://127.0.0.1:9222";
 const outputDir = path.resolve("..", "..", "outputs");
 await mkdir(outputDir, { recursive: true });
 
-const browser = await chromium.connectOverCDP(cdpUrl);
-const page = browser.contexts()[0]?.pages()[0];
-assert(page, "Tauri WebView2 page was not found");
+const { browser, page } = await connectTauriPage();
+const markdownPath = fixturePath("markdown-test.md");
+const xmlPath = fixturePath("generic.xml");
 
 try {
+  await openFixtureSession(page, [markdownPath, xmlPath], markdownPath);
   const tabBar = page.locator('[data-testid="tab-bar"]');
-  await tabBar.waitFor({ timeout: 15000 });
+  await tabBar.waitFor({ timeout: 20000 });
   await page.waitForTimeout(500);
 
   const tabs = await tabBar.innerText();
@@ -30,7 +30,7 @@ try {
   await page.screenshot({ path: screenshot, fullPage: true });
 
   await tabBar.locator('[role="tab"]', { hasText: "markdown-test.md" }).click();
-  await page.locator('[data-testid="markdown-view"]').waitFor();
+  await page.locator('[data-testid="muya-markdown-editor"]').waitFor();
 
   console.log(JSON.stringify({ ok: true, tabs, screenshot }, null, 2));
 } finally {

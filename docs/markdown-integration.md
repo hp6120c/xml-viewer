@@ -2,7 +2,7 @@
 
 ## 分支约定
 
-- 测试分支：`test/markdown-support`
+- 当前测试分支：`test/marktext-wysiwyg`
 - 参考项目：https://github.com/Neilooo/md-reader
 - 参考版本：`0b0ab58`（`main`，MIT License）
 - Markdown 功能完善并完成测试后再合并回正式分支；测试分支不直接触发正式 Release。
@@ -16,6 +16,14 @@
 - 两种文件共享标签页、文件夹打开、会话恢复、缩放、关闭保护、单实例、默认应用设置、GitHub 链接和自动更新。
 
 Markdown 没有模块、数据表、字段等数据库语义，因此不将 XML 专用的“表目录/字段详情/表级编辑”强行映射到 Markdown。
+
+## 当前落地方式
+
+Markdown 阅读和源码编辑已经合并为一个所见即所得界面，核心采用 MarkText 的
+Muya 内核（`@muyajs/core`）。项目保留 React/Tauri 外壳、文件关联、自动更新、
+相对图片安全加载和自定义选中文字字号/字体功能；早期 CodeMirror Markdown
+分栏方案已不作为当前实现。Muya/MarkText 的 MIT 许可声明见
+[`../tauri-app/THIRD_PARTY_NOTICES.md`](../tauri-app/THIRD_PARTY_NOTICES.md)。
 
 ## md-reader 功能拆分
 
