@@ -9,9 +9,16 @@ interface MarkdownOutlineProps {
   fileName: string;
   search: string;
   settings: MarkdownReadingSettings;
+  onSelectHeading?: (index: number) => void;
 }
 
-export function MarkdownOutline({ headings, fileName, search, settings }: MarkdownOutlineProps) {
+export function MarkdownOutline({
+  headings,
+  fileName,
+  search,
+  settings,
+  onSelectHeading,
+}: MarkdownOutlineProps) {
   const needle = search.trim().toLocaleLowerCase();
   const visible = needle
     ? headings.filter((heading) => heading.text.toLocaleLowerCase().includes(needle))
@@ -30,15 +37,14 @@ export function MarkdownOutline({ headings, fileName, search, settings }: Markdo
         <FileText size={14} />{fileName}
       </div>
       <div className="markdown-toc-list">
-        {visible.length > 0 ? visible.map((heading, index) => (
+        {visible.length > 0 ? visible.map((heading) => (
           <a
             className={`markdown-toc-item level-${Math.min(heading.level, 6)}`}
             href={`#${heading.id}`}
-            key={`${heading.id}:${index}`}
+            key={`${heading.id}:${headings.indexOf(heading)}`}
             onClick={(event) => {
               event.preventDefault();
-              const target = document.getElementById(heading.id);
-              target?.scrollIntoView({ behavior: "smooth", block: "start" });
+              onSelectHeading?.(headings.indexOf(heading));
             }}
           >
             <span>{heading.text || "未命名标题"}</span>

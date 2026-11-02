@@ -2,7 +2,7 @@
 
 这是 XML 数据库设计编辑器和 Markdown 编辑器的 **V2.x 桌面版**。当前项目已从旧版 Python/PyQt5 架构迁移到 **Tauri 2 + React + TypeScript + Rust**，XML 表格和 Markdown 文档由 Windows WebView2 中的 Chromium 内核渲染，不再受 `QTextBrowser` 的排版能力限制。
 
-> 软件支持查看和轻量编辑 SCL Schema XML，也支持 CommonMark/GFM Markdown 的阅读和源码编辑。界面会自动识别 XML 数据库结构、模块、表、字段，并为 Markdown 提供大纲、预览和编辑模式。
+> 软件支持查看和轻量编辑 SCL Schema XML，也支持 CommonMark/GFM Markdown。界面会自动识别 XML 数据库结构、模块、表、字段；Markdown 使用 MarkText 的 Muya 内核，在同一所见即所得界面中直接阅读、编辑内容和设置局部格式。
 
 ## 技术架构
 
@@ -12,14 +12,14 @@
 | 前端 | React 18 + TypeScript + Vite | 标签页、模块树、表详情、搜索、编辑器、响应式布局 |
 | 渲染 | Windows WebView2 | 使用 Chromium 渲染 HTML/CSS，支持流式宽度和复杂表格 |
 | 后端 | Rust | XML / Markdown 编解码、解析、校验、原子保存、目录扫描 |
-| 编辑器 | CodeMirror 6 | XML / Markdown 语法高亮、搜索和直接编辑 |
+| 编辑器 | CodeMirror 6 + Muya | XML 单表源码编辑；Markdown 所见即所得编辑、表格、任务列表、公式和图表 |
 | 打包 | Tauri NSIS | 生成 Windows 当前用户安装包并注册 `.xml` / `.md` / `.markdown` 文件关联 |
 | 更新 | Tauri Updater v2 | 校验签名并通过 GitHub Release 的 `latest.json` 发布更新 |
 
 核心数据流如下：
 
 1. Tauri 启动时读取命令行中的 `.xml` / `.md` / `.markdown` 路径；
-2. XML 按数据库结构解析；Markdown 读取为文本并交给前端渲染；
+2. XML 按数据库结构解析；Markdown 读取为文本并交给 Muya 内核渲染为可编辑文档；
 3. React 在 WebView2 中渲染模块树、总览和字段详情；
 4. 编辑时前端把修改后的单表 XML 片段发送给 Rust；
 5. Rust 先做完整 XML 校验，再通过同目录临时文件原子替换原文件；
@@ -39,9 +39,10 @@
 - 窗口尺寸自适应，表格宽度跟随内容区并支持必要时的水平滚动；
 - 界面缩放；
 - Windows `.xml` 文件关联、双击打开和单实例文件转交。
-- Markdown 标题大纲、GFM 表格、任务列表、脚注、代码高亮和 Front Matter；
-- Markdown 预览 / 编辑切换、保存、相对链接与受限相对图片加载；
-- Markdown 预览选区局部样式：字号、字体、文字颜色、背景高亮、粗体、斜体、下划线；
+- Markdown 标题大纲、GFM 表格、任务列表、脚注、高亮、数学公式、Mermaid、代码高亮和 Front Matter；
+- Markdown 所见即所得编辑，无需在阅读和源码模式之间切换；支持保存、撤销/重做、相对链接和受限相对图片加载；
+- 选中文字可直接使用 MarkText 的粗体、斜体、下划线、删除线、高亮、链接、行内代码和清除格式工具；
+- 在 MarkText 工具之外保留本项目自定义的选中文字字号、字体族设置；
 - 新建 Markdown / XML 文件、全屏模式（F11 / Esc 退出）和 Markdown 基础阅读样式；
 - Markdown 基础样式可单独调整左侧大纲字体、字号和字重；
 - Windows `.md` / `.markdown` 文件关联和混合文件标签页。
@@ -57,6 +58,7 @@ xml-viewer/
    ├─ src/                      # React/TypeScript 前端
    │  ├─ App.tsx               # 主界面和交互状态
    │  ├─ App.css               # 自适应布局和视觉样式
+   │  ├─ components/MuyaMarkdownEditor.tsx # Muya 内核与 Tauri 资源桥接
    │  ├─ lib/api.ts            # Tauri invoke/事件封装与浏览器演示模式
    │  └─ lib/xml.ts            # 前端筛选和统计辅助函数
    ├─ src-tauri/
@@ -74,7 +76,7 @@ xml-viewer/
 
 ### 必需软件
 
-- **Node.js 22 LTS**（最低 Node.js 18）；
+- **Node.js 22 LTS**（Muya 的部分图表依赖要求 Node.js 22）；
 - **Rust stable 1.85 或更新版本**。项目使用 Rust 2024 edition；
 - **Visual Studio Build Tools**，安装“使用 C++ 的桌面开发”工作负载和 Windows SDK；
 - **Microsoft Edge WebView2 Runtime**。Windows 10/11 通常已预装，如缺失可从微软官网安装；
@@ -157,6 +159,11 @@ node tests/end-to-end.mjs
 ```
 
 该测试会验证搜索、编辑、无效 XML 不落盘、有效 XML 原子写回和原文件恢复。调试端口只应在本地测试时开启，不要用于日常运行。
+
+## 第三方组件
+
+Markdown 编辑使用 MIT 许可的 MarkText / Muya（`@muyajs/core`）及其渲染依赖。许可证与版权声明见
+[`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md)，该文件也会随安装包分发。
 
 如果没有安装 Chrome，可安装 Google Chrome，或确认 Edge 位于默认安装目录。布局测试定位的是系统浏览器可执行文件，不是 WebView2 进程。
 

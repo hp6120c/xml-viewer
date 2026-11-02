@@ -13,7 +13,7 @@ try {
   assert.equal(await page.locator(".app-header").isVisible(), false);
   assert.equal(await page.locator(".toolbar").isVisible(), false);
   assert.equal(await page.locator(".app-footer").isVisible(), false);
-  assert.equal(await page.locator('[data-testid="tab-bar"]').count() >= 0, true);
+  assert.equal(await page.locator('[data-testid="tab-bar"]').isVisible(), true);
   const size = await page.evaluate(() => ({
     innerWidth: window.innerWidth,
     innerHeight: window.innerHeight,

@@ -29,7 +29,7 @@ await page.addInitScript(() => {
 
 try {
   await page.goto("http://localhost:1420", { waitUntil: "networkidle" });
-  await page.locator('[data-testid="markdown-view"]').waitFor();
+  await page.locator('[data-testid="muya-markdown-editor"]').waitFor();
   await page.locator(".toolbar .tool-button", { hasText: "基础样式" }).click();
   await page.locator(".markdown-settings-panel").waitFor();
 
@@ -41,14 +41,21 @@ try {
   await navSettings.locator("select").nth(1).selectOption("700");
   await navSettings.locator("input[type='range']").fill("16");
 
-  const result = await page.locator('[data-testid="markdown-view"]').evaluate((element) => {
+  const result = await page.locator('[data-testid="muya-markdown-editor"]').evaluate((element) => {
+    const container = element.querySelector(".mu-container");
     const style = getComputedStyle(element);
+    const containerStyle = container ? getComputedStyle(container) : null;
     return {
       theme: element.className,
       background: style.getPropertyValue("--md-bg").trim(),
       text: style.getPropertyValue("--md-text").trim(),
       fontSize: style.getPropertyValue("--md-font-size").trim(),
       width: style.getPropertyValue("--md-width").trim(),
+      computedFontSize: containerStyle?.fontSize,
+      computedColor: containerStyle?.color,
+      computedBackground: style.backgroundColor,
+      containerWidth: container?.getBoundingClientRect().width,
+      hostWidth: element.getBoundingClientRect().width,
     };
   });
   assert.match(result.theme, /markdown-theme-dark/);
@@ -56,6 +63,10 @@ try {
   assert.equal(result.text, "#dce8f2");
   assert.equal(result.fontSize, "19px");
   assert.equal(result.width, "none");
+  assert.equal(result.computedFontSize, "19px");
+  assert.match(result.theme, /markdown-theme-dark/);
+  assert.equal(result.computedBackground, "rgb(18, 26, 35)");
+  assert(result.containerWidth >= result.hostWidth - 2);
   const navStyle = await page.locator(".markdown-toc-item").first().evaluate((element) => {
     const style = getComputedStyle(element);
     return {
