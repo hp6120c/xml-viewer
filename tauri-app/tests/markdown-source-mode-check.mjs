@@ -30,9 +30,13 @@ try {
 
   const paragraph = page.locator(".mu-paragraph-content").first();
   await paragraph.click();
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(300);
   await page.keyboard.press("End");
-  await page.keyboard.type(" 源码切换保留");
+  await page.keyboard.insertText(" 源码切换保留");
+  await page.waitForFunction(() => {
+    const editor = document.querySelector('[data-testid="muya-markdown-editor"]');
+    return editor?.textContent?.includes("源码切换保留") === true;
+  });
   await page.getByRole("button", { name: "源码模式" }).click();
   await page.locator('[data-testid="markdown-source-editor"]').waitFor();
   let source = await page.locator('[data-testid="markdown-source-editor"] .cm-content').innerText();

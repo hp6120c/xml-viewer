@@ -206,7 +206,7 @@ xml-viewer/
 }
 
 export async function getAppInfo(): Promise<AppInfo> {
-  if (!hasTauri()) return { version: "2.1.0-demo" };
+  if (!hasTauri()) return { version: "2.2.0-demo" };
   return invoke<AppInfo>("get_app_info");
 }
 

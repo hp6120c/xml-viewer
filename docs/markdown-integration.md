@@ -2,7 +2,7 @@
 
 ## 分支约定
 
-- 当前测试分支：`test/marktext-wysiwyg`
+- 功能验证分支：`test/marktext-wysiwyg`（已合并至正式分支）
 - 参考项目：https://github.com/Neilooo/md-reader
 - 参考版本：`0b0ab58`（`main`，MIT License）
 - Markdown 功能完善并完成测试后再合并回正式分支；测试分支不直接触发正式 Release。

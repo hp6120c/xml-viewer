@@ -1,6 +1,6 @@
 # XML / Markdown 编辑器（Tauri 2）
 
-这是 XML 数据库设计编辑器和 Markdown 编辑器的 **V2.x 桌面版**。当前项目已从旧版 Python/PyQt5 架构迁移到 **Tauri 2 + React + TypeScript + Rust**，XML 表格和 Markdown 文档由 Windows WebView2 中的 Chromium 内核渲染，不再受 `QTextBrowser` 的排版能力限制。
+这是 XML 数据库设计编辑器和 Markdown 编辑器的 **V2.2.0 桌面版**。当前项目已从旧版 Python/PyQt5 架构迁移到 **Tauri 2 + React + TypeScript + Rust**，XML 表格和 Markdown 文档由 Windows WebView2 中的 Chromium 内核渲染，不再受 `QTextBrowser` 的排版能力限制。
 
 > 软件支持查看和轻量编辑 SCL Schema XML，也支持 CommonMark/GFM Markdown。界面会自动识别 XML 数据库结构、模块、表、字段；Markdown 使用 MarkText 的 Muya 内核，在同一所见即所得界面中直接阅读、编辑内容和设置局部格式。
 
@@ -329,11 +329,11 @@ V2 使用普通 DOM 和 CSS 渲染，不依赖富文本控件：
 - 手动触发：填写与项目版本一致的版本标签，构建并发布 Release；
 - 普通分支提交不会自动发布 Release。
 
-发布前会检查标签格式，以及 `package.json`、`package-lock.json`、`src-tauri/tauri.conf.json` 和 `src-tauri/Cargo.toml` 中的版本是否一致。正式发布示例：
+发布前会检查标签格式，以及 `package.json`、`package-lock.json`、`src-tauri/tauri.conf.json` 和 `src-tauri/Cargo.toml` 中的版本是否一致。当前正式发布示例：
 
 ```powershell
-git tag v2.0.1
-git push origin v2.0.1
+git tag v2.2.0
+git push origin v2.2.0
 ```
 
 ### GitHub Secrets 配置
@@ -366,7 +366,7 @@ env:
 
 1. 确认本机 updater 私钥与 `tauri.conf.json` 中的公钥来自同一对密钥；
 2. 把私钥完整内容保存到 `TAURI_SIGNING_PRIVATE_KEY`，有密码时再保存 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`；
-3. 确认下面四个文件的版本号一致。首次发布当前代码时为 `2.0.1`，后续发布时四个文件必须同步修改：
+3. 确认下面四个文件的版本号一致。当前正式版本为 `2.2.0`，后续发布时四个文件必须同步修改：
    - `tauri-app/package.json`
    - `tauri-app/package-lock.json`
    - `tauri-app/src-tauri/Cargo.toml`
@@ -376,8 +376,8 @@ env:
 6. 创建并推送版本标签：
 
 ```powershell
-git tag v2.0.1
-git push origin v2.0.1
+git tag v2.2.0
+git push origin v2.2.0
 ```
 
 也可以在 GitHub Actions 页面手动运行 `Build and Release Tauri App`，在 `release_tag` 中填写同一个标签。工作流会失败而不是发布版本不一致的安装包。之后的版本沿用同样流程，只需把标签和四个版本文件一起更新。
