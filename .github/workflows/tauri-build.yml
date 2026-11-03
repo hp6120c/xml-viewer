@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag, for example v2.2.1 (must match all project version fields)"
+        description: "Release tag, for example v2.2.2 (must match all project version fields)"
         required: true
         type: string
 
@@ -143,13 +143,13 @@ jobs:
           tagName: ${{ steps.meta.outputs.tag }}
           releaseName: XML / Markdown 编辑器 ${{ steps.meta.outputs.tag }}
           releaseBody: |
-            ## XML / Markdown 编辑器 V2.2.1
+            ## XML / Markdown 编辑器 V2.2.2
 
-            - 修复 Windows 默认应用注册把程序路径写成 `\\?\C:\...` 扩展路径，导致应用图标空白、双击文件提示“Windows 无法访问指定设备、路径或文件”的问题
-            - 修复升级或重新安装后，文件关联仍可能指向失效路径的问题
-            - 修复默认应用选择器无法稳定保存 XML / Markdown 编辑器的问题
-            - 已为 Windows 盘符路径和 UNC 路径增加正确转换及回归测试
-            - XML 数据模型、Markdown 编辑功能、文件关联范围和自动更新机制保持不变
+            - 修复 Markdown 表格编辑时浮动工具栏背景过淡、图标对比度不足的问题
+            - 表格列工具和行列操作菜单改为不透明背景，并增加清晰边框、阴影和悬停反馈
+            - 当前对齐状态、删除操作和普通图标使用可区分的颜色
+            - 深色主题下自动使用深色工具栏和浅色图标
+            - XML 数据模型、文件关联和自动更新机制保持不变
 
             Windows NSIS 安装包。自动更新清单为 `latest.json`，更新包使用 Tauri updater 签名。
           releaseCommitish: ${{ github.sha }}
