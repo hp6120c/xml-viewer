@@ -1,7 +1,4 @@
 #[cfg(target_os = "windows")]
-use std::path::Path;
-
-#[cfg(target_os = "windows")]
 use std::fs;
 
 #[cfg(target_os = "windows")]
@@ -36,7 +33,42 @@ fn installed_executable(hkcu: &RegKey) -> Option<std::path::PathBuf> {
 }
 
 #[cfg(target_os = "windows")]
-fn register_prog_id(hkcu: &RegKey, prog_id: &str, executable: &Path) -> Result<(), String> {
+fn windows_shell_path(path: &std::path::Path) -> Result<String, String> {
+    use std::ffi::OsString;
+    use std::path::{Component, Prefix};
+
+    let Some(Component::Prefix(prefix)) = path.components().next() else {
+        return path
+            .to_str()
+            .map(str::to_owned)
+            .ok_or_else(|| "程序路径包含无法转换为字符串的字符".to_string());
+    };
+
+    let suffix = path.strip_prefix(prefix.as_os_str()).unwrap_or(path);
+    let mut simplified = OsString::new();
+
+    match prefix.kind() {
+        Prefix::VerbatimDisk(drive) => {
+            simplified.push(format!("{}:", drive as char));
+            simplified.push(suffix);
+        }
+        Prefix::VerbatimUNC(server, share) => {
+            simplified.push(r"\\");
+            simplified.push(server);
+            simplified.push(r"\");
+            simplified.push(share);
+            simplified.push(suffix);
+        }
+        _ => simplified.push(path.as_os_str()),
+    }
+
+    simplified
+        .into_string()
+        .map_err(|_| "程序路径包含无法写入注册表的字符".to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn register_prog_id(hkcu: &RegKey, prog_id: &str, executable: &str) -> Result<(), String> {
     let (prog_key, _) = hkcu
         .create_subkey(format!(r"Software\Classes\{prog_id}"))
         .map_err(|error| registry_error("创建文件类型 ProgID 失败", error))?;
@@ -48,7 +80,7 @@ fn register_prog_id(hkcu: &RegKey, prog_id: &str, executable: &Path) -> Result<(
         .create_subkey("DefaultIcon")
         .map_err(|error| registry_error("创建 ProgID 图标项失败", error))?;
     icon_key
-        .set_value("", &format!("{},0", executable.display()))
+        .set_value("", &format!("{executable},0"))
         .map_err(|error| registry_error("写入 ProgID 图标失败", error))?;
 
     let (open_key, _) = prog_key
@@ -62,7 +94,7 @@ fn register_prog_id(hkcu: &RegKey, prog_id: &str, executable: &Path) -> Result<(
         .create_subkey("command")
         .map_err(|error| registry_error("创建 ProgID 命令项失败", error))?;
     command_key
-        .set_value("", &format!("\"{}\" \"%1\"", executable.display()))
+        .set_value("", &format!("\"{executable}\" \"%1\""))
         .map_err(|error| registry_error("写入 ProgID 打开命令失败", error))?;
     Ok(())
 }
@@ -74,12 +106,13 @@ fn register_prog_id(hkcu: &RegKey, prog_id: &str, executable: &Path) -> Result<(
 #[cfg(target_os = "windows")]
 pub fn register_file_associations() -> Result<(), String> {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let executable = installed_executable(&hkcu)
+    let executable_path = installed_executable(&hkcu)
         .or_else(|| std::env::current_exe().ok())
         .ok_or_else(|| "获取程序路径失败".to_string())?
         .canonicalize()
         .map_err(|error| format!("解析程序路径失败: {error}"))?;
-    fs::metadata(&executable).map_err(|error| format!("读取程序文件失败: {error}"))?;
+    fs::metadata(&executable_path).map_err(|error| format!("读取程序文件失败: {error}"))?;
+    let executable = windows_shell_path(&executable_path)?;
 
     let (app_key, _) = hkcu
         .create_subkey(APP_KEY)
@@ -95,14 +128,14 @@ pub fn register_file_associations() -> Result<(), String> {
         .create_subkey("DefaultIcon")
         .map_err(|error| registry_error("创建应用图标项失败", error))?;
     icon_key
-        .set_value("", &format!("{},0", executable.display()))
+        .set_value("", &format!("{executable},0"))
         .map_err(|error| registry_error("写入应用图标失败", error))?;
 
     let (command_key, _) = app_key
         .create_subkey(r"shell\open\command")
         .map_err(|error| registry_error("创建应用打开命令失败", error))?;
     command_key
-        .set_value("", &format!("\"{}\" \"%1\"", executable.display()))
+        .set_value("", &format!("\"{executable}\" \"%1\""))
         .map_err(|error| registry_error("写入应用打开命令失败", error))?;
 
     let (capabilities_key, _) = app_key
@@ -118,7 +151,7 @@ pub fn register_file_associations() -> Result<(), String> {
         )
         .map_err(|error| registry_error("写入应用能力描述失败", error))?;
     capabilities_key
-        .set_value("ApplicationIcon", &format!("{},0", executable.display()))
+        .set_value("ApplicationIcon", &format!("{executable},0"))
         .map_err(|error| registry_error("写入应用能力图标失败", error))?;
 
     let (associations_key, _) = capabilities_key
@@ -169,4 +202,62 @@ pub fn register_file_associations() -> Result<(), String> {
 #[cfg(not(target_os = "windows"))]
 pub fn register_file_associations() -> Result<(), String> {
     Err("文件关联注册仅支持 Windows".to_string())
+}
+
+#[cfg(all(test, target_os = "windows"))]
+mod tests {
+    use super::windows_shell_path;
+    use std::path::Path;
+
+    #[test]
+    fn shell_path_removes_extended_drive_prefix() {
+        assert_eq!(
+            windows_shell_path(Path::new(
+                r"\\?\C:\Users\Austin\AppData\Local\XML Markdown 编辑器\xml-database-viewer.exe"
+            ))
+            .unwrap(),
+            r"C:\Users\Austin\AppData\Local\XML Markdown 编辑器\xml-database-viewer.exe"
+        );
+    }
+
+    #[test]
+    fn shell_path_converts_extended_unc_prefix() {
+        assert_eq!(
+            windows_shell_path(Path::new(
+                r"\\?\UNC\server\share\XML Markdown 编辑器\xml-database-viewer.exe"
+            ))
+            .unwrap(),
+            r"\\server\share\XML Markdown 编辑器\xml-database-viewer.exe"
+        );
+    }
+
+    #[test]
+    fn shell_path_keeps_regular_path_unchanged() {
+        assert_eq!(
+            windows_shell_path(Path::new(
+                r"C:\Users\Austin\AppData\Local\XML Markdown 编辑器\xml-database-viewer.exe"
+            ))
+            .unwrap(),
+            r"C:\Users\Austin\AppData\Local\XML Markdown 编辑器\xml-database-viewer.exe"
+        );
+    }
+
+    #[test]
+    fn shell_path_keeps_regular_unc_path_unchanged() {
+        assert_eq!(
+            windows_shell_path(Path::new(
+                r"\\server\share\XML Markdown 编辑器\xml-database-viewer.exe"
+            ))
+            .unwrap(),
+            r"\\server\share\XML Markdown 编辑器\xml-database-viewer.exe"
+        );
+    }
+
+    #[test]
+    fn shell_path_does_not_mangle_volume_guid_path() {
+        let path = Path::new(
+            r"\\?\Volume{01234567-89ab-cdef-0123-456789abcdef}\XML Markdown 编辑器\xml-database-viewer.exe",
+        );
+        assert_eq!(windows_shell_path(path).unwrap(), path.to_string_lossy());
+    }
 }
