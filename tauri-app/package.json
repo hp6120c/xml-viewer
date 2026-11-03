@@ -1,7 +1,7 @@
 {
   "name": "xml-database-viewer",
   "private": true,
-  "version": "2.2.1",
+  "version": "2.2.2",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -26,6 +26,7 @@
     "test:markdown-settings": "node tests/markdown-settings-check.mjs",
     "test:muya-ui": "node tests/muya-ui-check.mjs",
     "test:muya-formatting": "node tests/muya-formatting-check.mjs",
+    "test:muya-table-toolbar": "node tests/muya-table-toolbar-check.mjs",
     "test:muya-edit-save": "node tests/muya-edit-save-check.mjs",
     "test:markdown-source-mode": "node tests/markdown-source-mode-check.mjs",
     "test:mixed-tabs": "node tests/mixed-tabs-check.mjs",

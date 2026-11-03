@@ -77,3 +77,89 @@
     padding-inline: min(var(--md-padding-x, 28px), 28px);
   }
 }
+
+/* Keep Muya's table edit controls readable over the document surface. */
+.muya-markdown-shell .mu-table-column-tools-container,
+.muya-markdown-shell .mu-table-bar-tools,
+.mu-table-column-tools-container,
+.mu-table-bar-tools {
+  color: #1f2937 !important;
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 6px !important;
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.04),
+    0 6px 18px rgba(15, 23, 42, 0.16) !important;
+  opacity: 1 !important;
+}
+
+.mu-table-column-tools li.item .icon-wrapper i.icon > i[class^="icon-"] {
+  filter: drop-shadow(14px 0 #334155) !important;
+}
+
+.mu-table-column-tools li.item:hover,
+.mu-table-bar-tools li.item:hover {
+  background: #e8eef5 !important;
+}
+
+.mu-table-column-tools li.item.active .icon-wrapper i.icon > i[class^="icon-"] {
+  filter: drop-shadow(14px 0 #2563eb) !important;
+}
+
+.mu-table-column-tools li.item.delete .icon-wrapper i.icon > i[class^="icon-"] {
+  filter: drop-shadow(14px 0 #dc2626) !important;
+}
+
+.mu-table-column-tools li.item:last-of-type::before,
+.mu-table-bar-tools li.item[data-label="remove"]::before {
+  background: #cbd5e1 !important;
+}
+
+.mu-table-bar-tools li.item {
+  color: #1f2937 !important;
+  opacity: 1 !important;
+}
+
+.mu-table-bar-tools li.item[data-label="remove"] {
+  color: #b91c1c !important;
+}
+
+:root:has(.markdown-theme-dark) .mu-table-column-tools-container,
+:root:has(.markdown-theme-dark) .mu-table-bar-tools {
+  color: #e2e8f0 !important;
+  background: #1e293b !important;
+  border-color: #475569 !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 6px 18px rgba(0, 0, 0, 0.42) !important;
+}
+
+:root:has(.markdown-theme-dark) .mu-table-column-tools li.item .icon-wrapper i.icon > i[class^="icon-"] {
+  filter: drop-shadow(14px 0 #e2e8f0) !important;
+}
+
+:root:has(.markdown-theme-dark) .mu-table-column-tools li.item:hover,
+:root:has(.markdown-theme-dark) .mu-table-bar-tools li.item:hover {
+  background: #334155 !important;
+}
+
+:root:has(.markdown-theme-dark) .mu-table-column-tools li.item.active .icon-wrapper i.icon > i[class^="icon-"] {
+  filter: drop-shadow(14px 0 #60a5fa) !important;
+}
+
+:root:has(.markdown-theme-dark) .mu-table-column-tools li.item.delete .icon-wrapper i.icon > i[class^="icon-"] {
+  filter: drop-shadow(14px 0 #f87171) !important;
+}
+
+:root:has(.markdown-theme-dark) .mu-table-column-tools li.item:last-of-type::before,
+:root:has(.markdown-theme-dark) .mu-table-bar-tools li.item[data-label="remove"]::before {
+  background: #64748b !important;
+}
+
+:root:has(.markdown-theme-dark) .mu-table-bar-tools li.item {
+  color: #e2e8f0 !important;
+}
+
+:root:has(.markdown-theme-dark) .mu-table-bar-tools li.item[data-label="remove"] {
+  color: #fca5a5 !important;
+}

@@ -153,7 +153,7 @@ async function askDiscard(message: string): Promise<boolean> {
 
 function App() {
   const initialSession = useRef(loadSession());
-  const [version, setVersion] = useState("2.2.1");
+  const [version, setVersion] = useState("2.2.2");
   const [documents, setDocuments] = useState<OpenedDocument[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
   const [selectedTableIndex, setSelectedTableIndex] = useState<number | null>(null);
