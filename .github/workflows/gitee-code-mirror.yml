@@ -1,0 +1,55 @@
+name: Mirror GitHub master to Gitee
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - "v*"
+      - "V*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitee-code-mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: Push master and tags to Gitee
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push code to Gitee
+        shell: pwsh
+        env:
+          GITEE_ACCESS_TOKEN: ${{ secrets.GITEE_ACCESS_TOKEN }}
+          GITEE_OWNER_INPUT: ${{ vars.GITEE_OWNER }}
+          GITEE_REPO_INPUT: ${{ vars.GITEE_REPO }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:GITEE_ACCESS_TOKEN)) {
+            throw "GITEE_ACCESS_TOKEN is required for Gitee code mirroring"
+          }
+          $owner = if ([string]::IsNullOrWhiteSpace($env:GITEE_OWNER_INPUT)) { "hp6120c" } else { $env:GITEE_OWNER_INPUT.Trim() }
+          $repo = if ([string]::IsNullOrWhiteSpace($env:GITEE_REPO_INPUT)) { "xml-viewer" } else { $env:GITEE_REPO_INPUT.Trim() }
+          $encodedToken = [Uri]::EscapeDataString($env:GITEE_ACCESS_TOKEN.Trim())
+          $remote = "https://oauth2:$encodedToken@gitee.com/$owner/$repo.git"
+
+          git fetch origin "+refs/heads/*:refs/remotes/origin/*" "+refs/tags/*:refs/tags/*"
+          if ($LASTEXITCODE -ne 0) { throw "Unable to fetch GitHub refs" }
+
+          git push $remote "refs/remotes/origin/master:refs/heads/master"
+          if ($LASTEXITCODE -ne 0) { throw "Unable to push master to Gitee" }
+
+          git push $remote --tags --force
+          if ($LASTEXITCODE -ne 0) { throw "Unable to push tags to Gitee" }
+
+          Write-Host "GitHub master and tags mirrored to Gitee"

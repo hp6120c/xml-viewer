@@ -173,6 +173,52 @@ $contentBody = @{
 if ($existingSha) { $contentBody.sha = $existingSha }
 Invoke-RestMethod -Method Put -Uri "https://api.github.com/repos/$githubRepo/contents/latest.json" -Headers $headers -Body ($contentBody | ConvertTo-Json -Compress) -ContentType "application/json" | Out-Null
 
+$encodedToken = [Uri]::EscapeDataString($token)
+$giteeGitUrl = "https://oauth2:$encodedToken@gitee.com/$owner/$giteeRepo.git"
+$updatesDir = Join-Path $env:RUNNER_TEMP "gitee-updates-$tag"
+if (Test-Path $updatesDir) {
+  [IO.Directory]::Delete($updatesDir, $true)
+}
+
+git clone --depth 1 --branch updates $giteeGitUrl $updatesDir 2>$null
+$cloneUpdatesExit = $LASTEXITCODE
+if ($cloneUpdatesExit -ne 0) {
+  if (Test-Path $updatesDir) {
+    [IO.Directory]::Delete($updatesDir, $true)
+  }
+  git clone --depth 1 $giteeGitUrl $updatesDir
+  if ($LASTEXITCODE -ne 0) {
+    throw "Unable to clone Gitee repository for updates branch"
+  }
+  Push-Location $updatesDir
+  try {
+    git checkout --orphan updates
+    if ($LASTEXITCODE -ne 0) { throw "Unable to create Gitee updates branch" }
+    git rm -rf .
+  } finally {
+    Pop-Location
+  }
+}
+
+Push-Location $updatesDir
+try {
+  Copy-Item -LiteralPath $giteeLatestPath -Destination (Join-Path $updatesDir "latest.json") -Force
+  git config user.name "github-actions[bot]"
+  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+  git add latest.json
+  git diff --cached --quiet
+  if ($LASTEXITCODE -eq 0) {
+    Write-Host "Gitee updates branch is already current"
+  } else {
+    git commit -m "chore(updater): publish $tag Gitee manifest"
+    if ($LASTEXITCODE -ne 0) { throw "Unable to commit Gitee updater manifest" }
+    git push origin HEAD:updates
+    if ($LASTEXITCODE -ne 0) { throw "Unable to push Gitee updater manifest" }
+  }
+} finally {
+  Pop-Location
+}
+
 Write-Host "Gitee release synced: $tag"
 Write-Host "Gitee installer URL: $setupDownloadUrl"
-Write-Host "Gitee updater manifest branch: $branch"
+Write-Host "Gitee updater manifest branch: updates"
