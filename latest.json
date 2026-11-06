@@ -5,7 +5,7 @@
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTNTFGSDBBbmNkRWtTMlp6bzhaOGlHYk9jOVY1SFBzM1NUQUFUbEt1VTJTdnNRYUZjbGNxeHRvYzlNdS85dVM3ZGMxcGhjUG5vWnRkL1hndHI1MnhWRWp1Q3l2em05ZVFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNzI3MTg3CWZpbGU6WE1MIE1hcmtkb3duIOe8lui+keWZqF8yLjIuMl94NjQtc2V0dXAuZXhlCXZlcnNpb246Mi4yLjIKdTVYYVk4MHMyWml4M21zTVBQQWkzZWRjbDJoL3NXbnByaitxdmJpVXpvblQ5OGxqVlhMcW1Xd0tBcXhNYVd6MkR4NVZ6K2xaZjFJMVVYTDB1a214Qmc9PQo=",
-      "url": "https://gitee.com/hp6120c/xml-viewer/releases/download/v2.2.2/XML.Markdown._2.2.2_x64-setup.exe"
+      "url": "https://gitee.com/hp6120c/xml-viewer/releases/download/v2.2.2/XML.Markdown._2.2.2_x64-setup.exe https://gitee.com/hp6120c/xml-viewer/releases/download/v2.2.2/XML.Markdown._2.2.2_x64-setup.exe.sig"
     },
     "windows-x86_64-nsis": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTNTFGSDBBbmNkRWtTMlp6bzhaOGlHYk9jOVY1SFBzM1NUQUFUbEt1VTJTdnNRYUZjbGNxeHRvYzlNdS85dVM3ZGMxcGhjUG5vWnRkL1hndHI1MnhWRWp1Q3l2em05ZVFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNzI3MTg3CWZpbGU6WE1MIE1hcmtkb3duIOe8lui+keWZqF8yLjIuMl94NjQtc2V0dXAuZXhlCXZlcnNpb246Mi4yLjIKdTVYYVk4MHMyWml4M21zTVBQQWkzZWRjbDJoL3NXbnByaitxdmJpVXpvblQ5OGxqVlhMcW1Xd0tBcXhNYVd6MkR4NVZ6K2xaZjFJMVVYTDB1a214Qmc9PQo=",
