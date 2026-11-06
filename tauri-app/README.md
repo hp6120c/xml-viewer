@@ -1,6 +1,6 @@
 # XML / Markdown / CSV 编辑器（Tauri 2）
 
-这是 XML 数据库设计编辑器、Markdown 编辑器和 CSV 表格编辑器的 **V2.2.2 桌面版**。当前项目已从旧版 Python/PyQt5 架构迁移到 **Tauri 2 + React + TypeScript + Rust**，XML 表格和 Markdown 文档由 Windows WebView2 中的 Chromium 内核渲染，不再受 `QTextBrowser` 的排版能力限制。
+这是 XML 数据库设计编辑器、Markdown 编辑器和 CSV 表格编辑器的 **V2.3.0 桌面版**。当前项目已从旧版 Python/PyQt5 架构迁移到 **Tauri 2 + React + TypeScript + Rust**，XML 表格和 Markdown 文档由 Windows WebView2 中的 Chromium 内核渲染，不再受 `QTextBrowser` 的排版能力限制。
 
 > 软件支持查看和轻量编辑 SCL Schema XML，也支持 CommonMark/GFM Markdown 和 CSV 表格。界面会自动识别 XML 数据库结构、模块、表、字段；Markdown 使用 MarkText 的 Muya 内核，在同一所见即所得界面中直接阅读、编辑内容和设置局部格式。
 
@@ -345,8 +345,8 @@ V2 使用普通 DOM 和 CSS 渲染，不依赖富文本控件：
 发布前会检查标签格式，以及 `package.json`、`package-lock.json`、`src-tauri/tauri.conf.json` 和 `src-tauri/Cargo.toml` 中的版本是否一致。当前正式发布示例：
 
 ```powershell
-git tag v2.2.2
-git push origin v2.2.2
+git tag v2.3.0
+git push origin v2.3.0
 ```
 
 ### Gitee 镜像与更新源
@@ -366,7 +366,7 @@ git push origin v2.2.2
 
 网页上的“通过 URL 导入仓库”如果只是导入动作，通常只执行一次；需要真正持续同步时，应在 Gitee 仓库的镜像管理/同步设置中开启自动同步。Gitee 镜像只同步 Git 分支和标签，**不会同步 GitHub Releases 附件**。
 
-配置 `GITEE_ACCESS_TOKEN` 后，`Sync Gitee Release` 工作流会下载 GitHub Release 中的安装包和签名，创建对应的 Gitee Release，上传 `*-setup.exe`、`*-setup.exe.sig`，再把改写为 Gitee 下载地址的 `latest.json` 推送到 GitHub 的 `updates` 分支。主发布工作流完成后会自动触发该同步；已有版本也可以在 Actions 中手动运行，例如把 `release_tag` 填为 `v2.2.2`。Gitee 镜像同步 `updates` 分支后，客户端可通过固定地址读取更新清单。
+配置 `GITEE_ACCESS_TOKEN` 后，`Sync Gitee Release` 工作流会下载 GitHub Release 中的安装包和签名，创建对应的 Gitee Release，上传 `*-setup.exe`、`*-setup.exe.sig`，再把改写为 Gitee 下载地址的 `latest.json` 推送到 GitHub 的 `updates` 分支。主发布工作流完成后会自动触发该同步；已有版本也可以在 Actions 中手动运行，例如把 `release_tag` 填为 `v2.3.0`。Gitee 镜像同步 `updates` 分支后，客户端可通过固定地址读取更新清单。
 
 客户端按以下顺序检查：
 
@@ -410,7 +410,7 @@ env:
 
 1. 确认本机 updater 私钥与 `tauri.conf.json` 中的公钥来自同一对密钥；
 2. 把私钥完整内容保存到 `TAURI_SIGNING_PRIVATE_KEY`，有密码时再保存 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`；
-3. 确认下面四个文件的版本号一致。当前正式版本为 `2.2.2`，后续发布时四个文件必须同步修改：
+3. 确认下面四个文件的版本号一致。当前正式版本为 `2.3.0`，后续发布时四个文件必须同步修改：
    - `tauri-app/package.json`
    - `tauri-app/package-lock.json`
    - `tauri-app/src-tauri/Cargo.toml`
@@ -420,8 +420,8 @@ env:
 6. 创建并推送版本标签：
 
 ```powershell
-git tag v2.2.2
-git push origin v2.2.2
+git tag v2.3.0
+git push origin v2.3.0
 ```
 
 也可以在 GitHub Actions 页面手动运行 `Build and Release Tauri App`，在 `release_tag` 中填写同一个标签。工作流会失败而不是发布版本不一致的安装包。之后的版本沿用同样流程，只需把标签和四个版本文件一起更新。

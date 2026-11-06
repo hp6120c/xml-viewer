@@ -143,15 +143,18 @@ jobs:
         with:
           projectPath: tauri-app
           tagName: ${{ steps.meta.outputs.tag }}
-          releaseName: XML / Markdown 编辑器 ${{ steps.meta.outputs.tag }}
+          releaseName: XML / Markdown / CSV 编辑器 ${{ steps.meta.outputs.tag }}
           releaseBody: |
-            ## XML / Markdown 编辑器 V2.2.2
+            ## XML / Markdown / CSV 编辑器 V2.3.0
 
-            - 修复 Markdown 表格编辑时浮动工具栏背景过淡、图标对比度不足的问题
-            - 表格列工具和行列操作菜单改为不透明背景，并增加清晰边框、阴影和悬停反馈
-            - 当前对齐状态、删除操作和普通图标使用可区分的颜色
-            - 深色主题下自动使用深色工具栏和浅色图标
-            - XML 数据模型、文件关联和自动更新机制保持不变
+            - 新增 CSV 阅读和编辑：分隔符识别、首行表头、行列增删、单元格编辑和列统计
+            - Excel/WPS 式列筛选下拉框，支持搜索、勾选、全选和清空
+            - 移除分页，使用无分页虚拟滚动浏览完整表格，3 万行 CSV 打开后约 0.6 秒可交互
+            - 支持 UTF-8、UTF-8 BOM、UTF-16LE/BE、GB18030、GBK、BIG5 读取与写回
+            - CSV 保存支持编码转换确认、BOM/换行风格保留、外部修改冲突检测和原子写入
+            - 接入 CSV 新建文件、文件夹扫描、拖放、命令行打开、单实例和 Windows 文件关联
+            - 自动更新优先读取 Gitee，失败时自动回退 GitHub；正式 Release 自动同步安装包、签名和更新清单到 Gitee
+            - XML 与 Markdown 原有功能保持一致
 
             Windows NSIS 安装包。自动更新清单为 `latest.json`，更新包使用 Tauri updater 签名。
           releaseCommitish: ${{ github.sha }}

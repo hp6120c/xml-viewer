@@ -226,7 +226,7 @@ export function demoCsvDocument(): CsvDocument {
   };
 }
 export async function getAppInfo(): Promise<AppInfo> {
-  if (!hasTauri()) return { version: "2.2.2-demo" };
+  if (!hasTauri()) return { version: "2.3.0-demo" };
   return invoke<AppInfo>("get_app_info");
 }
 

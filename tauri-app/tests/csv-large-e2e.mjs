@@ -158,10 +158,20 @@ try {
     { timeout: 10_000 },
   );
 
-  const lastRow = page.locator(".csv-editor-table tbody tr").last();
-  await lastRow.scrollIntoViewIfNeeded();
-  await lastRow.waitFor({ state: "visible", timeout: 10_000 });
-  const lastRowText = await lastRow.innerText();
+  const lastRowHandle = await page.waitForFunction(
+    () => {
+      const rows = Array.from(document.querySelectorAll(".csv-editor-table tbody tr"))
+        .filter((row) => row.querySelectorAll("td").length >= 5);
+      const lastRow = rows[rows.length - 1];
+      if (!lastRow) return false;
+      const text = lastRow.textContent ?? "";
+      if (!text.includes("商品30000") || !text.includes("图书")) return false;
+      return text;
+    },
+    undefined,
+    { timeout: 10_000 },
+  );
+  const lastRowText = await lastRowHandle.jsonValue();
   assert.match(lastRowText, /商品30000/, "The final CSV row should be reachable after scrolling");
   assert.match(lastRowText, /图书/, "The final CSV row should retain its category value");
 
