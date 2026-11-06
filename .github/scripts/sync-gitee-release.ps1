@@ -127,16 +127,20 @@ foreach ($asset in @($setupAsset, $signatureAsset)) {
   Write-Host "Uploaded to Gitee: $($asset.Name)"
 }
 
-$setupDownloadUrl = [string]$giteeAssets[$setupAsset.Name].browser_download_url
+$escapedSetupName = [Uri]::EscapeDataString($setupAsset.Name)
+$setupDownloadUrl = "https://gitee.com/$owner/$giteeRepo/releases/download/$tag/$escapedSetupName"
 if ([string]::IsNullOrWhiteSpace($setupDownloadUrl)) {
   throw "The Gitee installer download URL is missing"
 }
 
 $latest = Get-Content $githubLatestPath -Raw | ConvertFrom-Json
-if (-not $latest.platforms.'windows-x86_64') {
-  throw "GitHub latest.json has no windows-x86_64 platform entry"
+$windowsPlatforms = @($latest.platforms.PSObject.Properties | Where-Object { $_.Name -like "windows-x86_64*" })
+if ($windowsPlatforms.Count -eq 0) {
+  throw "GitHub latest.json has no Windows platform entry"
 }
-$latest.platforms.'windows-x86_64'.url = $setupDownloadUrl
+foreach ($platform in $windowsPlatforms) {
+  $platform.Value.url = $setupDownloadUrl
+}
 $giteeLatestPath = Join-Path $downloadDir "latest-gitee.json"
 $latest | ConvertTo-Json -Depth 20 | Set-Content -Path $giteeLatestPath -Encoding utf8
 
