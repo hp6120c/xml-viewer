@@ -57,15 +57,11 @@ $release = $null
 try {
   $release = Invoke-RestMethod -Method Get -Uri $releaseUri -TimeoutSec 30
 } catch {
+  $release = $null
+}
+if (-not $release -or -not $release.id) {
   Write-Host "Gitee release does not exist yet; creating $tag."
   $createUri = "$repoApi/releases?access_token=$token"
-  $createBody = @{
-    tag_name = $tag
-    name = "XML / Markdown / CSV 编辑器 $tag"
-    body = "Gitee mirror release for $tag. Installer and updater signature are mirrored from the GitHub release."
-    prerelease = "false"
-    target_commitish = "master"
-  }
   $createOutput = & curl.exe -sS -X POST $createUri `
     -F "tag_name=$tag" `
     -F "name=XML / Markdown / CSV 编辑器 $tag" `
