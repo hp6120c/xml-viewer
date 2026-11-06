@@ -1,0 +1,15 @@
+{
+  "version": "2.2.2",
+  "notes": "## XML / Markdown 编辑器 V2.2.2\n\n- 修复 Markdown 表格编辑时浮动工具栏背景过淡、图标对比度不足的问题\n- 表格列工具和行列操作菜单改为不透明背景，并增加清晰边框、阴影和悬停反馈\n- 当前对齐状态、删除操作和普通图标使用可区分的颜色\n- 深色主题下自动使用深色工具栏和浅色图标\n- XML 数据模型、文件关联和自动更新机制保持不变\n\nWindows NSIS 安装包。自动更新清单为 `latest.json`，更新包使用 Tauri updater 签名。",
+  "pub_date": "2026-11-03T17:33:11.924Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTNTFGSDBBbmNkRWtTMlp6bzhaOGlHYk9jOVY1SFBzM1NUQUFUbEt1VTJTdnNRYUZjbGNxeHRvYzlNdS85dVM3ZGMxcGhjUG5vWnRkL1hndHI1MnhWRWp1Q3l2em05ZVFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNzI3MTg3CWZpbGU6WE1MIE1hcmtkb3duIOe8lui+keWZqF8yLjIuMl94NjQtc2V0dXAuZXhlCXZlcnNpb246Mi4yLjIKdTVYYVk4MHMyWml4M21zTVBQQWkzZWRjbDJoL3NXbnByaitxdmJpVXpvblQ5OGxqVlhMcW1Xd0tBcXhNYVd6MkR4NVZ6K2xaZjFJMVVYTDB1a214Qmc9PQo=",
+      "url": "https://gitee.com/hp6120c/xml-viewer/releases/download/v2.2.2/XML.Markdown._2.2.2_x64-setup.exe"
+    },
+    "windows-x86_64-nsis": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTNTFGSDBBbmNkRWtTMlp6bzhaOGlHYk9jOVY1SFBzM1NUQUFUbEt1VTJTdnNRYUZjbGNxeHRvYzlNdS85dVM3ZGMxcGhjUG5vWnRkL1hndHI1MnhWRWp1Q3l2em05ZVFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNzI3MTg3CWZpbGU6WE1MIE1hcmtkb3duIOe8lui+keWZqF8yLjIuMl94NjQtc2V0dXAuZXhlCXZlcnNpb246Mi4yLjIKdTVYYVk4MHMyWml4M21zTVBQQWkzZWRjbDJoL3NXbnByaitxdmJpVXpvblQ5OGxqVlhMcW1Xd0tBcXhNYVd6MkR4NVZ6K2xaZjFJMVVYTDB1a214Qmc9PQo=",
+      "url": "https://api.github.com/repos/hp6120c/xml-viewer/releases/assets/706482082"
+    }
+  }
+}
