@@ -1438,6 +1438,16 @@ input:focus-visible {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.workspace.csv-workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.csv-content-pane {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
 .tab-type-icon {
   flex: 0 0 auto;
 }
@@ -1448,6 +1458,10 @@ input:focus-visible {
 
 .tab-type-icon.md {
   color: #15805f;
+}
+
+.tab-type-icon.csv {
+  color: #a06415;
 }
 
 .file-tab .tab-kind {
@@ -1468,6 +1482,11 @@ input:focus-visible {
 .file-tab .tab-kind.md {
   color: #15805f;
   background: #e9f8f2;
+}
+
+.file-tab .tab-kind.csv {
+  color: #91590d;
+  background: #fff2d9;
 }
 
 .file-tab > .tab-file-name {

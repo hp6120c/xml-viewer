@@ -1,6 +1,7 @@
 import type {
   AppInfo,
   ColumnInfo,
+  CsvDocument,
   MarkdownDocument,
   OpenedDocument,
   TableInfo,
@@ -162,13 +163,13 @@ export function demoDocument(): XmlDocument {
 }
 
 export function demoMarkdownDocument(): MarkdownDocument {
-  const source = `# XML / Markdown 编辑器
+  const source = `# XML / Markdown / CSV 编辑器
 
 支持 XML 数据库设计和 Markdown 文档阅读、编辑的桌面工具。
 
 ## 快速开始
 
-- 使用顶部“打开文件”打开单个 XML 或 Markdown 文件
+- 使用顶部“打开文件”打开单个 XML、Markdown 或 CSV 文件
 - 使用“打开文件夹”浏览同一目录中的多种文档
 - 标签页保留各自的查看位置
 
@@ -205,6 +206,25 @@ xml-viewer/
   };
 }
 
+export function demoCsvDocument(): CsvDocument {
+  const source = [
+    "编号,商品名称,分类,库存,单价,更新时间",
+    "S001,精品卷烟 A,卷烟,120,18.50,2026-11-01",
+    "S002,精品卷烟 B,卷烟,86,22.00,2026-11-01",
+    "S003,礼盒装,礼盒,34,128.00,2026-11-02",
+    "S004,陈列物料,物料,240,3.20,2026-11-02",
+    "S005,\"组合商品, 特惠装\",组合,18,199.00,2026-11-03",
+  ].join("\r\n");
+  return {
+    path: "demo://sample.csv",
+    fileName: "sample.csv",
+    fileSize: new Blob([source]).size,
+    encoding: "UTF-8",
+    kind: "csv",
+    source,
+    contentHash: `demo-csv-${source.length}`,
+  };
+}
 export async function getAppInfo(): Promise<AppInfo> {
   if (!hasTauri()) return { version: "2.2.2-demo" };
   return invoke<AppInfo>("get_app_info");
@@ -224,14 +244,45 @@ export function isMarkdownPath(path: string): boolean {
   return /\.(md|markdown)$/i.test(path);
 }
 
-export async function loadDocument(path: string): Promise<OpenedDocument> {
+export function isCsvPath(path: string): boolean {
+  return /\.csv$/i.test(path);
+}
+
+export async function loadCsvFile(path: string, encoding?: string): Promise<CsvDocument> {
+  if (!hasTauri()) return demoCsvDocument();
+  return invoke<CsvDocument>("load_csv_file", { path, encoding: encoding ?? null });
+}
+
+export async function loadDocument(path: string, encoding?: string): Promise<OpenedDocument> {
   if (!hasTauri()) {
-    return isMarkdownPath(path) ? demoMarkdownDocument() : demoDocument();
+    if (isMarkdownPath(path)) return demoMarkdownDocument();
+    if (isCsvPath(path)) return demoCsvDocument();
+    return demoDocument();
   }
   if (isMarkdownPath(path)) {
     return invoke<MarkdownDocument>("load_markdown_file", { path });
   }
+  if (isCsvPath(path)) {
+    return loadCsvFile(path, encoding);
+  }
   return invoke<XmlDocument>("load_xml_file", { path });
+}
+
+export async function saveCsvFile(
+  path: string,
+  newSource: string,
+  encoding: string,
+  expectedHash: string,
+  originalEncoding?: string,
+): Promise<CsvDocument> {
+  if (!hasTauri()) throw new Error("CSV 保存仅在桌面程序中可用");
+  return invoke<CsvDocument>("save_csv_file", {
+    path,
+    newSource,
+    encoding,
+    expectedHash,
+    originalEncoding: originalEncoding ?? null,
+  });
 }
 
 export async function scanXmlFiles(folder: string): Promise<string[]> {
@@ -261,43 +312,69 @@ export async function chooseDocuments(): Promise<string[]> {
   if (!hasTauri()) return [demoDocument().path];
   const dialog = await import("@tauri-apps/plugin-dialog");
   const selected = await dialog.open({
-    title: "选择 XML 或 Markdown 文件",
+    title: "选择 XML、Markdown 或 CSV 文件",
     multiple: true,
     directory: false,
-    filters: [{ name: "XML / Markdown 文件", extensions: ["xml", "md", "markdown"] }],
+    filters: [{
+      name: "XML / Markdown / CSV 文件",
+      extensions: ["xml", "md", "markdown", "csv"],
+    }],
   });
   if (!selected) return [];
   return Array.isArray(selected) ? selected : [selected];
 }
 
-export type NewDocumentKind = "markdown" | "xml";
+export type NewDocumentKind = "markdown" | "xml" | "csv";
+
+const NEW_DOCUMENT_OPTIONS: Record<NewDocumentKind, {
+  title: string;
+  defaultPath: string;
+  extensions: string[];
+  filterName: string;
+}> = {
+  markdown: {
+    title: "新建 Markdown 文档",
+    defaultPath: "未命名.md",
+    extensions: ["md", "markdown"],
+    filterName: "Markdown 文件",
+  },
+  xml: {
+    title: "新建 XML 文档",
+    defaultPath: "未命名.xml",
+    extensions: ["xml"],
+    filterName: "XML 文件",
+  },
+  csv: {
+    title: "新建 CSV 表格",
+    defaultPath: "未命名.csv",
+    extensions: ["csv"],
+    filterName: "CSV 文件",
+  },
+};
 
 export async function chooseNewDocument(kind: NewDocumentKind): Promise<string | null> {
   if (!hasTauri()) return null;
   const dialog = await import("@tauri-apps/plugin-dialog");
+  const options = NEW_DOCUMENT_OPTIONS[kind];
   const selected = await dialog.save({
-    title: kind === "markdown" ? "新建 Markdown 文档" : "新建 XML 文档",
-    defaultPath: kind === "markdown" ? "未命名.md" : "未命名.xml",
-    filters: kind === "markdown"
-      ? [{ name: "Markdown 文件", extensions: ["md", "markdown"] }]
-      : [{ name: "XML 文件", extensions: ["xml"] }],
+    title: options.title,
+    defaultPath: options.defaultPath,
+    filters: [{ name: options.filterName, extensions: options.extensions }],
   });
   if (!selected) return null;
-  if (kind === "markdown" && !/\.(md|markdown)$/i.test(selected)) return `${selected}.md`;
-  if (kind === "xml" && !/\.xml$/i.test(selected)) return `${selected}.xml`;
-  return selected;
+  const hasExtension = options.extensions.some((extension) => selected.toLowerCase().endsWith(`.${extension}`));
+  return hasExtension ? selected : `${selected}.${options.extensions[0]}`;
 }
 
 export async function createDocument(path: string, kind: NewDocumentKind): Promise<void> {
   if (!hasTauri()) return;
   await invoke("create_document_file", { path, kind });
 }
-
 export async function chooseFolder(): Promise<string | null> {
   if (!hasTauri()) return null;
   const dialog = await import("@tauri-apps/plugin-dialog");
   const selected = await dialog.open({
-    title: "选择包含 XML 或 Markdown 文件的文件夹",
+    title: "选择包含 XML、Markdown 或 CSV 文件的文件夹",
     multiple: false,
     directory: true,
   });

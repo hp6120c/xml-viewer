@@ -12,7 +12,7 @@ export interface UpdateDetails {
 export async function checkForUpdate(): Promise<UpdateDetails | null> {
   if (!isDesktopApp()) return null;
   const { check } = await import("@tauri-apps/plugin-updater");
-  const update = await check();
+  const update = await check({ timeout: 20_000 });
   if (!update) return null;
   return {
     currentVersion: update.currentVersion,

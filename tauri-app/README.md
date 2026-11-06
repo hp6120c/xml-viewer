@@ -1,8 +1,8 @@
-# XML / Markdown 编辑器（Tauri 2）
+# XML / Markdown / CSV 编辑器（Tauri 2）
 
-这是 XML 数据库设计编辑器和 Markdown 编辑器的 **V2.2.2 桌面版**。当前项目已从旧版 Python/PyQt5 架构迁移到 **Tauri 2 + React + TypeScript + Rust**，XML 表格和 Markdown 文档由 Windows WebView2 中的 Chromium 内核渲染，不再受 `QTextBrowser` 的排版能力限制。
+这是 XML 数据库设计编辑器、Markdown 编辑器和 CSV 表格编辑器的 **V2.2.2 桌面版**。当前项目已从旧版 Python/PyQt5 架构迁移到 **Tauri 2 + React + TypeScript + Rust**，XML 表格和 Markdown 文档由 Windows WebView2 中的 Chromium 内核渲染，不再受 `QTextBrowser` 的排版能力限制。
 
-> 软件支持查看和轻量编辑 SCL Schema XML，也支持 CommonMark/GFM Markdown。界面会自动识别 XML 数据库结构、模块、表、字段；Markdown 使用 MarkText 的 Muya 内核，在同一所见即所得界面中直接阅读、编辑内容和设置局部格式。
+> 软件支持查看和轻量编辑 SCL Schema XML，也支持 CommonMark/GFM Markdown 和 CSV 表格。界面会自动识别 XML 数据库结构、模块、表、字段；Markdown 使用 MarkText 的 Muya 内核，在同一所见即所得界面中直接阅读、编辑内容和设置局部格式。
 
 ## 技术架构
 
@@ -11,15 +11,15 @@
 | 桌面壳 | Tauri 2 | 窗口、单实例、文件关联、命令行参数、系统设置入口 |
 | 前端 | React 18 + TypeScript + Vite | 标签页、模块树、表详情、搜索、编辑器、响应式布局 |
 | 渲染 | Windows WebView2 | 使用 Chromium 渲染 HTML/CSS，支持流式宽度和复杂表格 |
-| 后端 | Rust | XML / Markdown 编解码、解析、校验、原子保存、目录扫描 |
+| 后端 | Rust | XML / Markdown / CSV 编解码、解析、校验、原子保存、目录扫描 |
 | 编辑器 | CodeMirror 6 + Muya | XML 单表源码编辑；Markdown 所见即所得编辑、表格、任务列表、公式和图表 |
-| 打包 | Tauri NSIS | 生成 Windows 当前用户安装包并注册 `.xml` / `.md` / `.markdown` 文件关联 |
-| 更新 | Tauri Updater v2 | 校验签名并通过 GitHub Release 的 `latest.json` 发布更新 |
+| 打包 | Tauri NSIS | 生成 Windows 当前用户安装包并注册 `.xml` / `.md` / `.markdown` / `.csv` 文件关联 |
+| 更新 | Tauri Updater v2 | 校验签名并优先读取 Gitee 更新清单，GitHub Release 作为兜底 |
 
 核心数据流如下：
 
-1. Tauri 启动时读取命令行中的 `.xml` / `.md` / `.markdown` 路径；
-2. XML 按数据库结构解析；Markdown 读取为文本并交给 Muya 内核渲染为可编辑文档；
+1. Tauri 启动时读取命令行中的 `.xml` / `.md` / `.markdown` / `.csv` 路径；
+2. XML 按数据库结构解析；Markdown 读取为文本并交给 Muya 内核渲染为可编辑文档；CSV 使用 Papa Parse 解析为表格；
 3. React 在 WebView2 中渲染模块树、总览和字段详情；
 4. 编辑时前端把修改后的单表 XML 片段发送给 Rust；
 5. Rust 先做完整 XML 校验，再通过同目录临时文件原子替换原文件；
@@ -44,7 +44,9 @@
 - 选中文字可直接使用 MarkText 原生的粗体、斜体、下划线、删除线、高亮、链接、行内代码和清除格式工具；
 - 新建 Markdown / XML 文件、全屏模式（F11 / Esc 退出）和 Markdown 基础阅读样式；
 - Markdown 基础样式可单独调整左侧大纲字体、字号和字重；
-- Windows `.md` / `.markdown` 文件关联和混合文件标签页。
+- CSV 表格阅读与编辑：分隔符和表头识别、Excel/WPS 式勾选筛选、数值与文本排序、无分页虚拟滚动、行列增删、单元格编辑、列统计；
+- CSV 支持 UTF-8、UTF-8 BOM、UTF-16LE/BE、GB18030、GBK、BIG5 读取与写回，并可按指定编码重新读取；
+- Windows `.md` / `.markdown` / `.csv` 文件关联和混合文件标签页。
 
 ## 目录结构
 
@@ -137,6 +139,7 @@ npm run check
 ```powershell
 npm run build
 npm run test:layout
+npm run test:csv-ui
 ```
 
 布局测试使用 Playwright 驱动本机 Chrome 或 Edge，在以下窗口尺寸检查总览页、字段表、搜索、主键/必填标记和水平溢出：
@@ -158,6 +161,16 @@ node tests/end-to-end.mjs
 ```
 
 该测试会验证搜索、编辑、无效 XML 不落盘、有效 XML 原子写回和原文件恢复。调试端口只应在本地测试时开启，不要用于日常运行。
+
+CSV UI 自动化测试使用同一套 Playwright 浏览器模式，覆盖铺满布局、Excel/WPS 式勾选筛选、升降序、无分页虚拟滚动、单元格编辑、Ctrl+S 提交、行列增删、编码切换和阅读/编辑模式：
+
+```powershell
+npm run build
+npm run test:csv-ui
+```
+
+需要验证真实 Tauri 文件和磁盘写回时，可在调试端口已开启的安装版上运行 `npm run test:csv-e2e`。`npm run test:csv-large-e2e` 会生成 30000 行 CSV，验证打开耗时、无分页、勾选筛选和滚动到底部。
+
 
 ## 第三方组件
 
@@ -205,7 +218,7 @@ Windows 不允许普通桌面程序静默把自己设为默认应用。Tauri 的
 - 让程序出现在“打开方式”和 Windows“默认应用”候选列表中；
 - 安装后允许用户通过双击、右键“打开方式”或系统设置选择本程序。
 
-程序启动时会额外注册当前用户的 `RegisteredApplications` 和 `Capabilities`，所以 `.xml`、`.md`、`.markdown` 都能在 Windows 默认应用选择器中出现。点击“默认应用设置”也会先刷新这些注册项。
+程序启动时会额外注册当前用户的 `RegisteredApplications` 和 `Capabilities`，所以 `.xml`、`.md`、`.markdown`、`.csv` 都能在 Windows 默认应用选择器中出现。点击“默认应用设置”也会先刷新这些注册项。
 
 它**不能绕过 Windows 的默认应用确认机制**，也不应该尝试直接修改系统默认关联来冒充用户确认。这是 Windows 平台的安全和用户体验约束，和 Tauri、Electron 或 Qt 无关。
 
@@ -222,8 +235,8 @@ ms-settings:defaultapps
 1. 打开“设置 → 应用 → 默认应用”；
 2. 选择“按文件类型选择默认应用”；
 3. 找到 `.xml`；
-4. 选择“XML / Markdown 编辑器”；
-5. 也可以右键任意 XML / Markdown 文件，选择“打开方式 → 选择其他应用”，勾选“始终使用此应用打开”；
+4. 选择“XML / Markdown / CSV 编辑器”；
+5. 也可以右键任意 XML / Markdown / CSV 文件，选择“打开方式 → 选择其他应用”，勾选“始终使用此应用打开”；
 
 Windows 11 不同版本的默认应用页面布局可能略有差异，但都必须在系统 UI 中由用户确认。安装包注册文件关联不代表它已经成为默认应用。
 
@@ -336,6 +349,36 @@ git tag v2.2.2
 git push origin v2.2.2
 ```
 
+### Gitee 镜像与更新源
+
+代码提交仍以 GitHub 为唯一源，Gitee 只作为自动同步镜像和国内更新源：
+
+1. 在 Gitee 创建同名仓库，例如 `https://gitee.com/hp6120c/xml-viewer`；
+2. 在 Gitee 仓库设置中启用 GitHub 仓库镜像同步，并同步所有分支和标签；
+3. 在 Gitee 创建私人令牌，授予仓库读取、代码推送和发行版管理权限；
+4. 在 GitHub 仓库的 **Settings → Secrets and variables → Actions** 添加：
+
+| 名称 | 类型 | 内容 |
+|---|---|---|
+| `GITEE_ACCESS_TOKEN` | Repository secret | Gitee 私人令牌 |
+| `GITEE_OWNER` | Repository variable | 可省略；默认 `hp6120c` |
+| `GITEE_REPO` | Repository variable | 可省略；默认 `xml-viewer` |
+
+网页上的“通过 URL 导入仓库”如果只是导入动作，通常只执行一次；需要真正持续同步时，应在 Gitee 仓库的镜像管理/同步设置中开启自动同步。Gitee 镜像只同步 Git 分支和标签，**不会同步 GitHub Releases 附件**。
+
+配置 `GITEE_ACCESS_TOKEN` 后，`Sync Gitee Release` 工作流会下载 GitHub Release 中的安装包和签名，创建对应的 Gitee Release，上传 `*-setup.exe`、`*-setup.exe.sig`，再把改写为 Gitee 下载地址的 `latest.json` 推送到 GitHub 的 `updates` 分支。主发布工作流完成后会自动触发该同步；已有版本也可以在 Actions 中手动运行，例如把 `release_tag` 填为 `v2.2.2`。Gitee 镜像同步 `updates` 分支后，客户端可通过固定地址读取更新清单。
+
+客户端按以下顺序检查：
+
+```text
+1. https://gitee.com/hp6120c/xml-viewer/raw/updates/latest.json
+2. https://github.com/hp6120c/xml-viewer/releases/latest/download/latest.json
+```
+
+Gitee 不存在、暂时不可访问或清单无效时，Tauri updater 会自动继续尝试 GitHub，不会因为单一源故障导致检查更新功能完全失效。若 Gitee 用户名或仓库名不同，需要同时修改 `src-tauri/tauri.conf.json` 和发布工作流中的固定地址。
+
+> Gitee 的代码镜像通常只同步 Git 分支和标签，不会自动复制 GitHub Release 附件。因此发布工作流额外负责 Gitee Release 附件上传，否则即使能检查到新版本，也可能无法从 Gitee 下载安装包。
+
 ### GitHub Secrets 配置
 
 在 GitHub 仓库中打开 **Settings → Secrets and variables → Actions → New repository secret**，配置：
@@ -345,6 +388,7 @@ git push origin v2.2.2
 | `TAURI_SIGNING_PRIVATE_KEY` | 必需 | 完整私钥文本内容；不要填写本机文件路径，因为该路径在 Actions Runner 上不存在 |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | 可选 | 生成私钥时设置的密码；没有密码就不要创建或留空 |
 | `GITHUB_TOKEN` | 自动提供 | GitHub Actions 内置令牌，不需要手工创建 |
+| `GITEE_ACCESS_TOKEN` | 可选但推荐 | 用于把 Release 附件和更新清单同步到 Gitee；未配置时自动跳过 Gitee 发布 |
 
 工作流会把这些 Secret 只注入到签名检查和 Tauri 构建步骤的环境变量中：
 
@@ -388,13 +432,14 @@ Release 完成后应包含：
 - `*-setup.exe.sig`：Tauri updater 签名；
 - `latest.json`：Tauri v2 更新清单，其中 `windows-x86_64.url` 指向当前 Release 的实际安装包。
 
-客户端更新端点固定为：
+客户端按 Gitee 优先、GitHub 兜底的顺序读取更新清单：
 
 ```text
+https://gitee.com/hp6120c/xml-viewer/raw/updates/latest.json
 https://github.com/hp6120c/xml-viewer/releases/latest/download/latest.json
 ```
 
-因此发布必须保持为非 draft、非 prerelease，并成为仓库的最新 Release。工作流最后会自动检查最新 Release、三个必需资产以及 `latest.json` 中的下载 URL。
+因此 GitHub 发布必须保持为非 draft、非 prerelease，并成为仓库的最新 Release。工作流会检查 GitHub Release 的三个必需资产和 `latest.json` 下载 URL；配置 `GITEE_ACCESS_TOKEN` 后，还会同步 Gitee Release 和 `updates` 分支。
 
 ## 已知边界
 
@@ -405,7 +450,7 @@ https://github.com/hp6120c/xml-viewer/releases/latest/download/latest.json
 - 界面编辑范围是单个 <table> 片段；通用 XML 模式当前以查看为主；
 - 当前构建使用 Tauri updater 的 minisign 签名，不等于 Windows Authenticode 代码签名；未配置代码签名证书时，首次下载仍可能出现 SmartScreen 提示；
 - 自动更新依赖同一把 updater 私钥持续签名；私钥丢失后无法为旧版本用户发布可验证的更新；
-- GitHub Release 的公开 `latest.json` 可能受 CDN 缓存影响，刚发布后短时间内的更新检查不保证立即看到新版本。
+- GitHub Release 和 Gitee Raw 都可能受缓存或镜像同步延迟影响，刚发布后短时间内的更新检查不保证立即看到新版本；Gitee 未就绪时会自动回退到 GitHub。
 
 
 

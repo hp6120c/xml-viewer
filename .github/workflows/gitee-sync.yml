@@ -1,0 +1,65 @@
+name: Sync Gitee Release
+
+on:
+  workflow_run:
+    workflows:
+      - Build and Release Tauri App
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to sync, for example v2.2.2. Leave empty to use the latest GitHub release."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gitee-release-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    name: Upload release assets to Gitee
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout automation script
+        uses: actions/checkout@v4
+
+      - name: Resolve release tag
+        id: meta
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG_INPUT: ${{ inputs.release_tag }}
+        run: |
+          $tag = $env:RELEASE_TAG_INPUT.Trim()
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            $tag = gh api "repos/$env:GITHUB_REPOSITORY/releases/latest" --jq ".tag_name"
+            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($tag)) {
+              throw "Unable to resolve the latest GitHub release tag"
+            }
+          }
+          if ($tag -notmatch '^[vV]\d+\.\d+\.\d+') {
+            throw "Invalid release tag: $tag"
+          }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          Write-Host "Sync release tag: $tag"
+
+      - name: Sync Gitee release and updater manifest
+        shell: pwsh
+        env:
+          GITEE_ACCESS_TOKEN: ${{ secrets.GITEE_ACCESS_TOKEN }}
+          GITEE_OWNER_INPUT: ${{ vars.GITEE_OWNER }}
+          GITEE_REPO_INPUT: ${{ vars.GITEE_REPO }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          $owner = if ([string]::IsNullOrWhiteSpace($env:GITEE_OWNER_INPUT)) { "hp6120c" } else { $env:GITEE_OWNER_INPUT.Trim() }
+          $repo = if ([string]::IsNullOrWhiteSpace($env:GITEE_REPO_INPUT)) { "xml-viewer" } else { $env:GITEE_REPO_INPUT.Trim() }
+          & ./.github/scripts/sync-gitee-release.ps1 -Tag $env:RELEASE_TAG -Owner $owner -Repo $repo

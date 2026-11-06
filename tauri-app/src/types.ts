@@ -105,7 +105,17 @@ export interface MarkdownDocument {
   contentHash: string;
 }
 
-export type OpenedDocument = XmlDocument | MarkdownDocument;
+export interface CsvDocument {
+  path: string;
+  fileName: string;
+  fileSize: number;
+  encoding: string;
+  kind: "csv";
+  source: string;
+  contentHash: string;
+}
+
+export type OpenedDocument = XmlDocument | MarkdownDocument | CsvDocument;
 
 export interface TableSource {
   tableIndex: number;

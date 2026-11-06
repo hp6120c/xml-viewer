@@ -17,6 +17,9 @@ const XML_PROG_ID: &str = "XML Database Design";
 const MARKDOWN_PROG_ID: &str = "Markdown Document";
 
 #[cfg(target_os = "windows")]
+const CSV_PROG_ID: &str = "CSV Document";
+
+#[cfg(target_os = "windows")]
 fn registry_error(context: &str, error: impl std::fmt::Display) -> String {
     format!("{context}: {error}")
 }
@@ -87,7 +90,7 @@ fn register_prog_id(hkcu: &RegKey, prog_id: &str, executable: &str) -> Result<()
         .create_subkey(r"shell\open")
         .map_err(|error| registry_error("创建 ProgID 打开项失败", error))?;
     open_key
-        .set_value("", &"使用 XML / Markdown 编辑器打开")
+        .set_value("", &"使用 XML / Markdown / CSV 编辑器打开")
         .map_err(|error| registry_error("写入 ProgID 打开说明失败", error))?;
 
     let (command_key, _) = open_key
@@ -118,7 +121,7 @@ pub fn register_file_associations() -> Result<(), String> {
         .create_subkey(APP_KEY)
         .map_err(|error| registry_error("创建应用注册项失败", error))?;
     app_key
-        .set_value("FriendlyAppName", &"XML / Markdown 编辑器")
+        .set_value("FriendlyAppName", &"XML / Markdown / CSV 编辑器")
         .map_err(|error| registry_error("写入应用名称失败", error))?;
     app_key
         .set_value("ApplicationCompany", &"hp6120c")
@@ -142,13 +145,10 @@ pub fn register_file_associations() -> Result<(), String> {
         .create_subkey("Capabilities")
         .map_err(|error| registry_error("创建应用能力项失败", error))?;
     capabilities_key
-        .set_value("ApplicationName", &"XML / Markdown 编辑器")
+        .set_value("ApplicationName", &"XML / Markdown / CSV 编辑器")
         .map_err(|error| registry_error("写入应用能力名称失败", error))?;
     capabilities_key
-        .set_value(
-            "ApplicationDescription",
-            &"XML 数据库设计和 Markdown 文档编辑器",
-        )
+        .set_value("ApplicationDescription", &"XML、Markdown 和 CSV 文档编辑器")
         .map_err(|error| registry_error("写入应用能力描述失败", error))?;
     capabilities_key
         .set_value("ApplicationIcon", &format!("{executable},0"))
@@ -166,6 +166,9 @@ pub fn register_file_associations() -> Result<(), String> {
     associations_key
         .set_value(".markdown", &MARKDOWN_PROG_ID)
         .map_err(|error| registry_error("注册 Markdown 扩展名能力失败", error))?;
+    associations_key
+        .set_value(".csv", &CSV_PROG_ID)
+        .map_err(|error| registry_error("注册 CSV 能力失败", error))?;
 
     let (registered_apps, _) = hkcu
         .create_subkey(r"Software\RegisteredApplications")
@@ -176,6 +179,7 @@ pub fn register_file_associations() -> Result<(), String> {
 
     register_prog_id(&hkcu, XML_PROG_ID, &executable)?;
     register_prog_id(&hkcu, MARKDOWN_PROG_ID, &executable)?;
+    register_prog_id(&hkcu, CSV_PROG_ID, &executable)?;
 
     let (classes_key, _) = hkcu
         .create_subkey(r"Software\Classes")
@@ -184,6 +188,7 @@ pub fn register_file_associations() -> Result<(), String> {
         (".xml", XML_PROG_ID, "application/xml"),
         (".md", MARKDOWN_PROG_ID, "text/markdown"),
         (".markdown", MARKDOWN_PROG_ID, "text/markdown"),
+        (".csv", CSV_PROG_ID, "text/csv"),
     ] {
         let (extension_key, _) = classes_key
             .create_subkey(extension)

@@ -1,7 +1,7 @@
 [package]
 name = "xml-database-viewer"
 version = "2.2.2"
-description = "SCL Schema XML and Markdown document viewer"
+description = "SCL Schema XML, Markdown and CSV document editor"
 authors = ["hp6120c"]
 edition = "2024"
 

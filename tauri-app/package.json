@@ -30,8 +30,12 @@
     "test:muya-edit-save": "node tests/muya-edit-save-check.mjs",
     "test:markdown-source-mode": "node tests/markdown-source-mode-check.mjs",
     "test:mixed-tabs": "node tests/mixed-tabs-check.mjs",
+    "test:csv-e2e": "node tests/csv-e2e.mjs",
+    "test:csv-large-e2e": "node tests/csv-large-e2e.mjs",
+    "test:csv-ui": "node tests/csv-ui-check.mjs",
     "test:new-file": "node tests/new-file-e2e.mjs",
     "test:update": "node tests/update-check.mjs",
+    "test:updater-endpoints": "node tests/updater-endpoints-check.mjs",
     "test:fullscreen": "node tests/fullscreen-e2e.mjs"
   },
   "dependencies": {
@@ -56,6 +60,7 @@
     "markdown-it-emoji": "^3.1.0",
     "markdown-it-footnote": "^4.0.0",
     "markdown-it-task-lists": "^2.1.1",
+    "papaparse": "^5.5.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "yaml": "^2.9.1"
@@ -65,6 +70,7 @@
     "@types/markdown-it": "^14.2.0",
     "@types/markdown-it-anchor": "^4.0.4",
     "@types/markdown-it-footnote": "^3.0.4",
+    "@types/papaparse": "^5.3.16",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",

@@ -32,7 +32,7 @@ try {
   const body = await page.locator('[data-testid="muya-markdown-editor"]').innerText();
   assert.match(body, /快速开始/);
   assert.match(body, /目录结构/);
-  assert.match(body, /XML \/ Markdown 编辑器/);
+  assert.match(body, /XML \/ Markdown \/ CSV 编辑器/);
   await page.getByText("Designed and developed by Austin.H", { exact: true }).waitFor();
   const footerMetrics = await page.evaluate(() => {
     const footer = document.querySelector(".app-footer");

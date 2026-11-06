@@ -21,6 +21,7 @@ import {
   Eye,
   FileText,
   FilePlus2,
+  FileSpreadsheet,
   FolderOpen,
   Github,
   HelpCircle,
@@ -54,6 +55,9 @@ import { GenericXmlView } from "./components/GenericXmlView";
 
 import { MarkdownOutline } from "./components/MarkdownOutline";
 
+import { CsvEditor } from "./components/CsvEditor";
+import type { CsvEditorHandle } from "./components/CsvEditor";
+
 import { MarkdownSettingsPanel } from "./components/MarkdownSettingsPanel";
 
 import {
@@ -69,6 +73,7 @@ import {
   loadDocument,
   openDefaultAppsSettings,
   openExternalUrl,
+  saveCsvFile,
   saveMarkdownFile,
   saveTableSource,
   setFullscreen,
@@ -93,7 +98,7 @@ import {
   loadMarkdownSettings,
   saveMarkdownSettings,
 } from "./lib/markdown-settings";
-import type { OpenedDocument, TableInfo } from "./types";
+import type { CsvDocument, OpenedDocument, TableInfo } from "./types";
 
 const MuyaMarkdownEditor = lazy(() =>
   import("./components/MuyaMarkdownEditor").then((module) => ({
@@ -107,9 +112,19 @@ const MarkdownSourceEditor = lazy(() =>
   })),
 );
 
-type ViewMode = "overview" | "detail" | "edit" | "markdown-read" | "markdown-edit";
+type ViewMode = "overview" | "detail" | "edit" | "markdown-read" | "markdown-edit" | "csv-read" | "csv-edit";
 type ToastState = { kind: "success" | "error" | "info"; message: string } | null;
 type TabMenuState = { x: number; y: number; path: string } | null;
+type CsvBaseline = Pick<CsvDocument, "source" | "encoding" | "contentHash" | "fileSize">;
+
+function csvBaseline(document: CsvDocument): CsvBaseline {
+  return {
+    source: document.source,
+    encoding: document.encoding,
+    contentHash: document.contentHash,
+    fileSize: document.fileSize,
+  };
+}
 
 function updateNotes(update: UpdateDetails): string {
   const notes = update.body.trim();
@@ -138,17 +153,26 @@ async function confirmUpdate(update: UpdateDetails): Promise<boolean> {
   return window.confirm(message);
 }
 
-async function askDiscard(message: string): Promise<boolean> {
+async function confirmAction(
+  message: string,
+  title: string,
+  okLabel: string,
+  cancelLabel: string,
+): Promise<boolean> {
   if (isDesktopApp()) {
     const dialog = await import("@tauri-apps/plugin-dialog");
     return dialog.ask(message, {
-      title: "未保存的修改",
+      title,
       kind: "warning",
-      okLabel: "放弃修改",
-      cancelLabel: "继续编辑",
+      okLabel,
+      cancelLabel,
     });
   }
   return window.confirm(message);
+}
+
+async function askDiscard(message: string): Promise<boolean> {
+  return confirmAction(message, "未保存的修改", "放弃修改", "继续编辑");
 }
 
 function App() {
@@ -174,6 +198,7 @@ function App() {
   const [markdownSettings, setMarkdownSettings] = useState(loadMarkdownSettings);
   const [markdownSettingsOpen, setMarkdownSettingsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [csvReloadRevision, setCsvReloadRevision] = useState(0);
   const [sidebarWidths, setSidebarWidths] = useState(
     () => initialSession.current?.sidebarWidths ?? { xml: 278, markdown: 260 },
   );
@@ -194,13 +219,16 @@ function App() {
   const resizingSidebarRef = useRef(false);
   const markdownBaselineRef = useRef("");
   const markdownSourceRef = useRef("");
+  const csvBaselineRef = useRef<CsvBaseline | null>(null);
+  const csvSourceRef = useRef("");
+  const csvEditorRef = useRef<CsvEditorHandle | null>(null);
 
   const activeDocument = useMemo(
     () => documents.find((document) => document.path === activePath) ?? null,
     [documents, activePath],
   );
   const activeTables = useMemo(() => {
-    if (!activeDocument || activeDocument.kind === "markdown") return [];
+    if (!activeDocument || activeDocument.kind === "markdown" || activeDocument.kind === "csv") return [];
     return activeDocument.modules.flatMap((module) => [
       ...module.tables,
       ...module.submodules.flatMap((submodule) => submodule.tables),
@@ -211,7 +239,7 @@ function App() {
     [activeTables, selectedTableIndex],
   );
   const filteredModules = useMemo(
-    () => (activeDocument && activeDocument.kind !== "markdown"
+    () => (activeDocument && (activeDocument.kind === "scl" || activeDocument.kind === "xml")
       ? filterModules(activeDocument.modules, search)
       : []),
     [activeDocument, search],
@@ -227,7 +255,7 @@ function App() {
   const totals = useMemo(
     () => documents.reduce(
       (result, document) => {
-        if (document.kind === "markdown") return result;
+        if (document.kind === "markdown" || document.kind === "csv") return result;
         return {
           modules: result.modules + moduleCount(document),
           tables: result.tables + tableCount(document),
@@ -309,9 +337,15 @@ function App() {
     });
   }, [activePath, documents, sessionReady, sidebarWidths, zoom]);
 
-  const resetWorkspaceView = useCallback((markdown = false) => {
+  const resetWorkspaceView = useCallback((kind?: OpenedDocument["kind"]) => {
     editRequestRef.current += 1;
-    setMode(markdown ? "markdown-read" : "overview");
+    setMode(
+      kind === "markdown"
+        ? "markdown-read"
+        : kind === "csv"
+          ? "csv-read"
+          : "overview",
+    );
     setSelectedTableIndex(null);
     setEditingTableIndex(null);
     setEditingTableId(null);
@@ -319,7 +353,6 @@ function App() {
     editorRevisionRef.current = 0;
     setDirty(false);
   }, []);
-
   const restoreMarkdownBaseline = useCallback((path = activePath) => {
     if (!path) return;
     const baseline = markdownBaselineRef.current;
@@ -335,6 +368,19 @@ function App() {
     setDirty(false);
   }, [activePath]);
 
+  const restoreCsvBaseline = useCallback((path = activePath) => {
+    if (!path) return;
+    const baseline = csvBaselineRef.current;
+    if (!baseline) return;
+    csvSourceRef.current = baseline.source;
+    setDocuments((current) => current.map((document) =>
+      document.path === path && document.kind === "csv"
+        ? { ...document, ...baseline }
+        : document,
+    ));
+    dirtyRef.current = false;
+    setDirty(false);
+  }, [activePath]);
   const replaceDocument = useCallback((nextDocument: OpenedDocument) => {
     setDocuments((current) =>
       current.map((document) => (document.path === nextDocument.path ? nextDocument : document)),
@@ -350,6 +396,11 @@ function App() {
       const discard = await askDiscard("打开其他文件会放弃当前文档尚未保存的修改，是否继续？");
       if (!discard) return false;
       if (activeDocument?.kind === "markdown") restoreMarkdownBaseline(activeDocument.path);
+      else if (activeDocument?.kind === "csv") restoreCsvBaseline(activeDocument.path);
+      else {
+        dirtyRef.current = false;
+        setDirty(false);
+      }
     }
 
     setBusy(`正在读取 ${unique.length} 个文件...`);
@@ -382,11 +433,14 @@ function App() {
       const destination = loaded.find((document) => document.path === preferredPath) ?? loaded[0];
       setActivePath(destination.path);
       setSearch("");
-      resetWorkspaceView(destination.kind === "markdown");
+      resetWorkspaceView(destination.kind);
       if (destination.kind === "markdown") {
         markdownBaselineRef.current = destination.source;
         markdownSourceRef.current = destination.source;
         setEditorContent(destination.source);
+      } else if (destination.kind === "csv") {
+        csvBaselineRef.current = csvBaseline(destination);
+        csvSourceRef.current = destination.source;
       }
     }
 
@@ -398,7 +452,7 @@ function App() {
     }
     setBusy(null);
     return loaded.length > 0;
-  }, [activeDocument, resetWorkspaceView, restoreMarkdownBaseline]);
+  }, [activeDocument, resetWorkspaceView, restoreCsvBaseline, restoreMarkdownBaseline]);
 
   const loadPathsRef = useRef(loadPaths);
   loadPathsRef.current = loadPaths;
@@ -678,21 +732,182 @@ function App() {
     setMode("markdown-edit");
   }, [activeDocument, mode]);
 
+  const handleCsvChange = useCallback((nextSource: string) => {
+    if (!activeDocument || activeDocument.kind !== "csv") return;
+    const baseline = csvBaselineRef.current;
+    const nextDirty = baseline
+      ? nextSource !== baseline.source || activeDocument.encoding !== baseline.encoding
+      : true;
+    csvSourceRef.current = nextSource;
+    setDocuments((current) => current.map((document) =>
+      document.path === activeDocument.path && document.kind === "csv"
+        ? {
+            ...document,
+            source: nextSource,
+            fileSize: new Blob([nextSource]).size,
+          }
+        : document,
+    ));
+    editorRevisionRef.current += 1;
+    dirtyRef.current = nextDirty;
+    setDirty(nextDirty);
+  }, [activeDocument]);
+
+  const markCsvDraftDirty = useCallback(() => {
+    dirtyRef.current = true;
+    setDirty(true);
+  }, []);
+
+  const saveCsvEdit = useCallback(async (exitAfterSave: boolean): Promise<boolean> => {
+    if (!activeDocument || activeDocument.kind !== "csv") return false;
+    const pendingSource = csvEditorRef.current?.flushPendingEdit();
+    const sourceToSave = pendingSource ?? csvSourceRef.current ?? activeDocument.source;
+    const baseline = csvBaselineRef.current;
+    const sourceChanged = baseline ? sourceToSave !== baseline.source : true;
+    const encodingChanged = baseline ? activeDocument.encoding !== baseline.encoding : false;
+    if (!sourceChanged && !encodingChanged) {
+      if (exitAfterSave) setMode("csv-read");
+      return true;
+    }
+    if (encodingChanged) {
+      const confirmed = await confirmAction(
+        `保存后文件将按 ${activeDocument.encoding} 编码重新写入。\n\n如果当前文本是按错误编码重新读取的乱码，请先取消，再选择正确编码重读或退出编辑模式恢复原内容。`,
+        "确认编码转换",
+        "转换并保存",
+        "取消",
+      );
+      if (!confirmed) return false;
+    }
+    const sessionId = editRequestRef.current;
+    const savedRevision = editorRevisionRef.current;
+    setBusy("正在保存 CSV 表格...");
+    try {
+      const nextDocument = await saveCsvFile(
+        activeDocument.path,
+        sourceToSave,
+        activeDocument.encoding,
+        activeDocument.contentHash,
+        baseline?.encoding,
+      );
+      csvBaselineRef.current = csvBaseline(nextDocument);
+      if (editorRevisionRef.current !== savedRevision) {
+        setDocuments((current) => current.map((document) =>
+          document.path === activeDocument.path && document.kind === "csv"
+            ? {
+                ...document,
+                contentHash: nextDocument.contentHash,
+                encoding: nextDocument.encoding,
+                fileSize: nextDocument.fileSize,
+              }
+            : document,
+        ));
+        dirtyRef.current = true;
+        setDirty(true);
+        setToast({ kind: "error", message: "保存期间内容又发生了变化，磁盘已保存到上一次快照，请再次保存" });
+        return false;
+      }
+      replaceDocument(nextDocument);
+      csvSourceRef.current = nextDocument.source;
+      dirtyRef.current = false;
+      setDirty(false);
+      setToast({ kind: "success", message: "CSV 表格已保存" });
+      if (exitAfterSave) setMode("csv-read");
+      return true;
+    } catch (error) {
+      if (sessionId === editRequestRef.current) {
+        setToast({ kind: "error", message: String(error) });
+      }
+      return false;
+    } finally {
+      if (sessionId === editRequestRef.current) setBusy(null);
+    }
+  }, [activeDocument, replaceDocument]);
+
+  const toggleCsvEditMode = useCallback(() => {
+    if (!activeDocument || activeDocument.kind !== "csv") return;
+    if (mode === "csv-edit") csvEditorRef.current?.flushPendingEdit();
+    setMode((current) => current === "csv-edit" ? "csv-read" : "csv-edit");
+  }, [activeDocument, mode]);
+
+  const changeCsvEncoding = useCallback((encoding: string) => {
+    if (!activeDocument || activeDocument.kind !== "csv" || encoding === activeDocument.encoding) return;
+    const baseline = csvBaselineRef.current;
+    const sourceChanged = baseline ? activeDocument.source !== baseline.source : true;
+    const encodingChanged = baseline ? encoding !== baseline.encoding : true;
+    setDocuments((current) => current.map((document) =>
+      document.path === activeDocument.path && document.kind === "csv"
+        ? { ...document, encoding }
+        : document,
+    ));
+    dirtyRef.current = sourceChanged || encodingChanged;
+    setDirty(sourceChanged || encodingChanged);
+    setToast({
+      kind: "info",
+      message: `保存 CSV 时将使用 ${encoding} 编码`,
+    });
+  }, [activeDocument]);
+
+  const reloadCsvEncoding = useCallback(async () => {
+    if (!activeDocument || activeDocument.kind !== "csv") return;
+    if (dirtyRef.current) {
+      const discard = await askDiscard(
+        "按编码重新读取会放弃当前尚未保存的修改，是否继续？",
+      );
+      if (!discard) return;
+    }
+    setBusy(`正在按 ${activeDocument.encoding} 重新读取 CSV...`);
+    try {
+      const loaded = await loadDocument(activeDocument.path, activeDocument.encoding);
+      if (loaded.kind !== "csv") throw new Error("重新读取后文件类型不是 CSV");
+      replaceDocument(loaded);
+      csvSourceRef.current = loaded.source;
+      const baseline = csvBaselineRef.current;
+      const nextDirty = baseline
+        ? loaded.source !== baseline.source || loaded.encoding !== baseline.encoding
+        : true;
+      dirtyRef.current = nextDirty;
+      setDirty(nextDirty);
+      setCsvReloadRevision((current) => current + 1);
+      setMode("csv-read");
+      setToast({
+        kind: "info",
+        message: nextDirty
+          ? `已按 ${loaded.encoding} 重读，请确认内容；保存后会按该编码覆盖文件`
+          : `已按 ${loaded.encoding} 重新读取 CSV`,
+      });
+    } catch (error) {
+      setToast({ kind: "error", message: `按编码重新读取失败：${String(error)}` });
+    } finally {
+      setBusy(null);
+    }
+  }, [activeDocument, replaceDocument]);
+
   const cancelEdit = useCallback(async () => {
     if (dirty) {
       const discard = await askDiscard(
-        activeDocument?.kind === "markdown" ? "确定放弃当前 Markdown 文档的修改吗？" : "确定放弃当前表的修改吗？",
+        activeDocument?.kind === "markdown"
+          ? "确定放弃当前 Markdown 文档的修改吗？"
+          : activeDocument?.kind === "csv"
+            ? "确定放弃当前 CSV 表格的修改吗？"
+            : "确定放弃当前表的修改吗？",
       );
       if (!discard) return;
     }
     editRequestRef.current += 1;
     if (activeDocument?.kind === "markdown") restoreMarkdownBaseline(activeDocument.path);
+    else if (activeDocument?.kind === "csv") restoreCsvBaseline(activeDocument.path);
     else {
       dirtyRef.current = false;
       setDirty(false);
     }
-    setMode(activeDocument?.kind === "markdown" ? "markdown-read" : (activeTable ? "detail" : "overview"));
-  }, [activeDocument, activeTable, dirty, restoreMarkdownBaseline]);
+    setMode(
+      activeDocument?.kind === "markdown"
+        ? "markdown-read"
+        : activeDocument?.kind === "csv"
+          ? "csv-read"
+          : (activeTable ? "detail" : "overview"),
+    );
+  }, [activeDocument, activeTable, dirty, restoreCsvBaseline, restoreMarkdownBaseline]);
 
   const selectTable = useCallback(async (table: TableInfo) => {
     if (mode === "edit") {
@@ -708,6 +923,7 @@ function App() {
       const discard = await askDiscard("切换标签页会放弃当前尚未保存的修改，是否继续？");
       if (!discard) return;
       if (activeDocument?.kind === "markdown") restoreMarkdownBaseline(activeDocument.path);
+      else if (activeDocument?.kind === "csv") restoreCsvBaseline(activeDocument.path);
       else {
         dirtyRef.current = false;
         setDirty(false);
@@ -715,13 +931,16 @@ function App() {
     }
     setActivePath(path);
     const next = documentsRef.current.find((document) => document.path === path);
-    resetWorkspaceView(next?.kind === "markdown");
+    resetWorkspaceView(next?.kind);
     if (next?.kind === "markdown") {
       markdownBaselineRef.current = next.source;
       markdownSourceRef.current = next.source;
       setEditorContent(next.source);
+    } else if (next?.kind === "csv") {
+      csvBaselineRef.current = csvBaseline(next);
+      csvSourceRef.current = next.source;
     }
-  }, [activeDocument, activePath, dirty, resetWorkspaceView, restoreMarkdownBaseline]);
+  }, [activeDocument, activePath, dirty, resetWorkspaceView, restoreCsvBaseline, restoreMarkdownBaseline]);
 
   const closePaths = useCallback(async (pathsToClose: string[]) => {
     const unique = new Set(pathsToClose);
@@ -729,6 +948,7 @@ function App() {
       const discard = await askDiscard("关闭当前标签页会放弃尚未保存的修改，是否继续？");
       if (!discard) return;
       if (activeDocument?.kind === "markdown") restoreMarkdownBaseline(activeDocument.path);
+      else if (activeDocument?.kind === "csv") restoreCsvBaseline(activeDocument.path);
       else {
         dirtyRef.current = false;
         setDirty(false);
@@ -743,15 +963,18 @@ function App() {
       const nextPath = remaining[Math.min(Math.max(oldActiveIndex, 0), Math.max(remaining.length - 1, 0))] ?? null;
       setActivePath(nextPath);
       const next = remainingDocuments.find((document) => document.path === nextPath);
-      resetWorkspaceView(next?.kind === "markdown");
+      resetWorkspaceView(next?.kind);
       if (next?.kind === "markdown") {
         markdownBaselineRef.current = next.source;
         markdownSourceRef.current = next.source;
         setEditorContent(next.source);
+      } else if (next?.kind === "csv") {
+        csvBaselineRef.current = csvBaseline(next);
+        csvSourceRef.current = next.source;
       }
     }
     setTabMenu(null);
-  }, [activeDocument, activePath, dirty, resetWorkspaceView, restoreMarkdownBaseline]);
+  }, [activeDocument, activePath, dirty, resetWorkspaceView, restoreCsvBaseline, restoreMarkdownBaseline]);
 
   const openFiles = useCallback(async () => {
     try {
@@ -762,7 +985,7 @@ function App() {
     }
   }, [loadPaths]);
 
-  const createNewDocument = useCallback(async (kind: "markdown" | "xml") => {
+  const createNewDocument = useCallback(async (kind: "markdown" | "xml" | "csv") => {
     try {
       setNewFileMenuOpen(false);
       const path = await chooseNewDocument(kind);
@@ -774,7 +997,11 @@ function App() {
       if (loaded) {
         setToast({
           kind: "success",
-          message: kind === "markdown" ? "已新建 Markdown 文档" : "已新建 XML 文档",
+          message: kind === "markdown"
+            ? "已新建 Markdown 文档"
+            : kind === "csv"
+              ? "已新建 CSV 表格"
+              : "已新建 XML 文档",
         });
       }
     } catch (error) {
@@ -787,11 +1014,11 @@ function App() {
     try {
       const folder = await chooseFolder();
       if (!folder) return;
-      setBusy("正在扫描 XML / Markdown 文件...");
+      setBusy("正在扫描 XML / Markdown / CSV 文件...");
       const paths = await scanDocuments(folder);
       setBusy(null);
       if (paths.length === 0) {
-        setToast({ kind: "info", message: "所选目录中没有找到 XML 或 Markdown 文件" });
+        setToast({ kind: "info", message: "所选目录中没有找到 XML、Markdown 或 CSV 文件" });
         return;
       }
       await loadPaths(paths);
@@ -859,6 +1086,12 @@ function App() {
         setEditorContent(nextDocument.source);
         editorRevisionRef.current = 0;
         if (mode === "markdown-edit") setMode("markdown-read");
+      } else if (nextDocument.kind === "csv") {
+        csvBaselineRef.current = csvBaseline(nextDocument);
+        csvSourceRef.current = nextDocument.source;
+        setCsvReloadRevision((current) => current + 1);
+        editorRevisionRef.current = 0;
+        if (mode === "csv-edit") setMode("csv-read");
       } else if (selectedTableIndex !== null) {
         const exists = nextDocument.modules.some((module) =>
           module.tables.some((table) => table.nodeIndex === selectedTableIndex)
@@ -892,12 +1125,16 @@ function App() {
       if (event.key.toLowerCase() === "s") {
         event.preventDefault();
         if (activeDocument?.kind === "markdown") void saveMarkdownEdit(false);
+        else if (activeDocument?.kind === "csv") void saveCsvEdit(false);
         else void saveEdit(false);
       }
       if (event.key.toLowerCase() === "e") {
         event.preventDefault();
         if (activeDocument?.kind === "markdown") {
           void toggleMarkdownSourceMode();
+          return;
+        } else if (activeDocument?.kind === "csv") {
+          toggleCsvEditMode();
           return;
         } else if (mode === "edit") {
           void saveEdit(true);
@@ -916,7 +1153,9 @@ function App() {
     isFullscreen,
     mode,
     saveEdit,
+    saveCsvEdit,
     saveMarkdownEdit,
+    toggleCsvEditMode,
     toggleMarkdownSourceMode,
     toggleFullscreen,
   ]);
@@ -943,13 +1182,15 @@ function App() {
         <div className="brand">
           <div className="brand-mark"><Table2 size={22} /></div>
           <div>
-            <h1>XML / Markdown 编辑器</h1>
+            <h1>XML / Markdown / CSV 编辑器</h1>
             <span>
               {activeDocument?.kind === "markdown"
                 ? "Markdown 文档"
-                : activeDocument?.kind === "xml"
-                  ? "通用 XML 文档"
-                  : "SCL Schema XML"}
+                : activeDocument?.kind === "csv"
+                  ? "CSV 表格"
+                  : activeDocument?.kind === "xml"
+                    ? "通用 XML 文档"
+                    : "SCL Schema XML"}
             </span>
           </div>
         </div>
@@ -985,6 +1226,9 @@ function App() {
               <button type="button" role="menuitem" onClick={() => void createNewDocument("xml")}>
                 <Table2 size={15} />新建 XML 文档
               </button>
+              <button type="button" role="menuitem" onClick={() => void createNewDocument("csv")}>
+                <FileSpreadsheet size={15} />新建 CSV 表格
+              </button>
             </div>
           )}
         </div>
@@ -1014,6 +1258,36 @@ function App() {
               <Save size={17} />保存更改
             </button>
           </>
+        ) : activeDocument?.kind === "csv" ? (
+          <>
+            <button
+              type="button"
+              className={`tool-button ${mode === "csv-edit" ? "active" : ""}`}
+              onClick={toggleCsvEditMode}
+              title={mode === "csv-edit" ? "切换到阅读模式（Ctrl+E）" : "切换到编辑模式（Ctrl+E）"}
+            >
+              {mode === "csv-edit" ? <Eye size={17} /> : <PencilLine size={17} />}
+              {mode === "csv-edit" ? "阅读模式" : "编辑模式"}
+            </button>
+            <button
+              type="button"
+              className="tool-button"
+              onClick={() => void saveCsvEdit(false)}
+              disabled={!dirty}
+            >
+              <Save size={17} />保存表格
+            </button>
+            {dirty && (
+              <button
+                type="button"
+                className="tool-button"
+                onClick={() => void cancelEdit()}
+                title="恢复到最近一次保存的内容和编码"
+              >
+                <RotateCcw size={17} />放弃修改
+              </button>
+            )}
+          </>
         ) : (
           <button
             type="button"
@@ -1038,7 +1312,7 @@ function App() {
           </button>
         )}
 
-        <label className="search-box">
+        <label className="search-box" style={{ display: activeDocument?.kind === "csv" ? "none" : undefined }}>
           <Search size={16} />
           <input
             value={search}
@@ -1116,6 +1390,12 @@ function App() {
             <span>字数 <strong>{activeMarkdownStats?.wordCount.toLocaleString() ?? 0}</strong></span>
             <span>预计阅读 <strong>{activeMarkdownStats?.readingMinutes ?? 0} 分钟</strong></span>
           </>
+        ) : activeDocument?.kind === "csv" ? (
+          <>
+            <span>CSV 表格</span>
+            <span>编码 <strong>{activeDocument.encoding}</strong></span>
+            <span>可筛选、排序并滚动浏览全部数据</span>
+          </>
         ) : (
           <>
             <span>模块 <strong>{totals.modules}</strong></span>
@@ -1126,7 +1406,7 @@ function App() {
         <span className="stats-file">
           {activeDocument
             ? `当前：${activeDocument.fileName} · ${formatBytes(activeDocument.fileSize)}`
-            : "请打开 XML 或 Markdown 文件"}
+            : "请打开 XML、Markdown 或 CSV 文件"}
         </span>
       </div>
 
@@ -1147,9 +1427,11 @@ function App() {
                 >
                   {document.kind === "markdown"
                     ? <FileText size={13} className="tab-type-icon md" />
-                    : <Table2 size={13} className="tab-type-icon xml" />}
-                  <span className={`tab-kind ${document.kind === "markdown" ? "md" : "xml"}`}>
-                    {document.kind === "markdown" ? "MD" : "XML"}
+                    : document.kind === "csv"
+                      ? <FileSpreadsheet size={13} className="tab-type-icon csv" />
+                      : <Table2 size={13} className="tab-type-icon xml" />}
+                  <span className={`tab-kind ${document.kind === "markdown" ? "md" : document.kind === "csv" ? "csv" : "xml"}`}>
+                    {document.kind === "markdown" ? "MD" : document.kind === "csv" ? "CSV" : "XML"}
                   </span>
                   <span className="tab-file-name">{document.fileName.replace(/^scl_schema_/i, "")}</span>
                   {active && dirty && <span className="tab-dirty-dot" aria-label="有未保存的修改" />}
@@ -1191,7 +1473,7 @@ function App() {
         </button>
       )}
       <main
-        className={`workspace ${activeDocument?.kind === "xml" ? "generic-workspace" : ""} ${activeDocument?.kind === "markdown" ? "markdown-workspace" : ""} ${activeDocument ? "" : "empty-workspace"}`}
+        className={`workspace ${activeDocument?.kind === "xml" ? "generic-workspace" : ""} ${activeDocument?.kind === "markdown" ? "markdown-workspace" : ""} ${activeDocument?.kind === "csv" ? "csv-workspace" : ""} ${activeDocument ? "" : "empty-workspace"}`}
         style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
       >
         {activeDocument ? (
@@ -1242,6 +1524,21 @@ function App() {
                 )}
               </section>
             </>
+          ) : activeDocument.kind === "csv" ? (
+            <section className="content-pane csv-content-pane" data-testid="content-pane">
+              <CsvEditor
+                key={`${activeDocument.path}:${csvReloadRevision}`}
+                ref={csvEditorRef}
+                source={activeDocument.source}
+                encoding={activeDocument.encoding}
+                fileName={activeDocument.fileName}
+                readOnly={mode !== "csv-edit"}
+                onSourceChange={handleCsvChange}
+                onEncodingChange={changeCsvEncoding}
+                onReloadEncoding={() => void reloadCsvEncoding()}
+                onDraftChange={markCsvDraftDirty}
+              />
+            </section>
           ) : activeDocument.kind === "xml" ? (
             <section className="content-pane" data-testid="content-pane">
               <GenericXmlView document={activeDocument} />
@@ -1327,17 +1624,17 @@ function App() {
         ) : (
           <div className="welcome" data-testid="welcome">
             <div className="welcome-icon"><Table2 size={42} /></div>
-            <h1>打开 XML 或 Markdown 文档</h1>
-            <p>支持 SCL Schema 数据库结构查看、Markdown 文档阅读和直接编辑，所有文件都在同一套标签页中管理。</p>
+            <h1>打开 XML、Markdown 或 CSV 文件</h1>
+            <p>支持 SCL Schema 数据库结构查看、Markdown 文档编辑和 CSV 表格阅读/编辑，所有文件都在同一套标签页中管理。</p>
             <div className="welcome-actions">
               <button type="button" className="primary-button" onClick={openFolder}>
                 <FolderOpen size={17} />打开文件夹
               </button>
               <button type="button" className="secondary-button" onClick={openFiles}>
-                <FilePlus2 size={17} />打开 XML / Markdown 文件
+                <FilePlus2 size={17} />打开 XML / Markdown / CSV 文件
               </button>
             </div>
-            <div className="welcome-hint"><HelpCircle size={15} />也可以直接把 XML 或 Markdown 文件拖进窗口</div>
+            <div className="welcome-hint"><HelpCircle size={15} />也可以直接把 XML、Markdown 或 CSV 文件拖进窗口</div>
           </div>
         )}
       </main>
@@ -1345,7 +1642,7 @@ function App() {
       {dragActive && (
         <div className="drop-overlay">
           <FolderOpen size={44} />
-          <strong>松开以打开 XML / Markdown 文件或文件夹</strong>
+          <strong>松开以打开 XML、Markdown、CSV 文件或文件夹</strong>
         </div>
       )}
 
@@ -1402,7 +1699,7 @@ function App() {
       <footer className="app-footer">
         <span className="footer-meta">
           {activeDocument
-            ? `${activeDocument.encoding} · ${activeDocument.kind === "markdown" ? "Markdown" : activeDocument.rootTag}`
+            ? `${activeDocument.encoding} · ${activeDocument.kind === "markdown" ? "Markdown" : activeDocument.kind === "csv" ? "CSV" : activeDocument.rootTag}`
             : "就绪"}
         </span>
         <strong className="footer-author">Designed and developed by Austin.H</strong>

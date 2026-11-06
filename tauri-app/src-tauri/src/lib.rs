@@ -6,7 +6,7 @@ use serde::Serialize;
 use std::path::Path;
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State};
-use text::MarkdownDocument;
+use text::{CsvDocument, MarkdownDocument};
 use xml::{FileSource, TableSource, XmlDocument};
 
 #[derive(Default)]
@@ -67,6 +67,28 @@ fn save_markdown_file(
     expected_hash: String,
 ) -> Result<MarkdownDocument, String> {
     text::save_markdown_file(Path::new(&path), &new_source, &expected_hash)
+}
+
+#[tauri::command]
+fn load_csv_file(path: String, encoding: Option<String>) -> Result<CsvDocument, String> {
+    text::load_csv_file(Path::new(&path), encoding.as_deref())
+}
+
+#[tauri::command]
+fn save_csv_file(
+    path: String,
+    new_source: String,
+    encoding: String,
+    expected_hash: String,
+    original_encoding: Option<String>,
+) -> Result<CsvDocument, String> {
+    text::save_csv_file_with_origin(
+        Path::new(&path),
+        &new_source,
+        &encoding,
+        &expected_hash,
+        original_encoding.as_deref(),
+    )
 }
 
 #[tauri::command]
@@ -171,6 +193,8 @@ pub fn run() {
             scan_document_files,
             load_markdown_file,
             save_markdown_file,
+            load_csv_file,
+            save_csv_file,
             create_document_file,
             read_markdown_asset,
             register_file_associations,

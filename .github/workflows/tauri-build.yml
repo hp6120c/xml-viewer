@@ -118,9 +118,11 @@ jobs:
           if (-not $tauri.bundle.createUpdaterArtifacts) {
             throw "bundle.createUpdaterArtifacts must be enabled for signed updater releases"
           }
-          $expectedEndpoint = "https://github.com/hp6120c/xml-viewer/releases/latest/download/latest.json"
-          if (@($tauri.plugins.updater.endpoints) -notcontains $expectedEndpoint) {
-            throw "The updater endpoint in tauri.conf.json does not match $expectedEndpoint"
+          $expectedGiteeEndpoint = "https://gitee.com/hp6120c/xml-viewer/raw/updates/latest.json"
+          $expectedGithubEndpoint = "https://github.com/hp6120c/xml-viewer/releases/latest/download/latest.json"
+          $endpoints = @($tauri.plugins.updater.endpoints)
+          if ($endpoints.Count -lt 2 -or $endpoints[0] -ne $expectedGiteeEndpoint -or $endpoints[1] -ne $expectedGithubEndpoint) {
+            throw "Updater endpoints must be Gitee first and GitHub fallback second"
           }
 
           "version=$version" >> $env:GITHUB_OUTPUT
@@ -248,4 +250,3 @@ jobs:
 
           Write-Host "Release assets verified: $setupAsset, $setupAsset.sig, latest.json"
           Write-Host "Updater URL verified: $($uri.AbsoluteUri)"
-

@@ -26,7 +26,7 @@ await page.addInitScript(() => {
 try {
   await page.goto("http://localhost:1420", { waitUntil: "networkidle" });
   await page.locator('[data-testid="muya-markdown-editor"]').waitFor({ timeout: 30000 });
-  await page.locator(".mu-atx-heading", { hasText: "XML / Markdown 编辑器" }).waitFor();
+  await page.locator(".mu-atx-heading", { hasText: "XML / Markdown / CSV 编辑器" }).waitFor();
 
   const paragraph = page.locator(".mu-paragraph-content").first();
   await paragraph.click();

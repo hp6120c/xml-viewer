@@ -1,6 +1,6 @@
-# XML / Markdown 编辑器
+# XML / Markdown / CSV 编辑器
 
-当前正式版本为 **V2.2.2**，架构为 **Tauri 2 + React + TypeScript + Rust**，运行在 Windows WebView2/Chromium 上。本版本在 XML 数据库编辑器基础上增加 Markdown 阅读和编辑能力，使用标准 HTML/CSS 自适应布局。
+当前正式版本为 **V2.2.2**，架构为 **Tauri 2 + React + TypeScript + Rust**，运行在 Windows WebView2/Chromium 上。本版本在 XML 数据库编辑器基础上增加 Markdown 与 CSV 阅读、编辑能力，使用标准 HTML/CSS 自适应布局。
 
 ## 目录
 
@@ -19,13 +19,15 @@
 - Markdown 默认使用所见即所得编辑，也可切换到 Markdown 源码模式；基于 MarkText 的 Muya 内核，支持 GFM 表格、任务列表、脚注、代码高亮、数学公式、Mermaid 和 YAML Front Matter
 - Markdown 标题大纲、未保存保护、原编码/BOM/换行风格保留和原子写回
 - Markdown 相对图片安全加载，仅允许读取当前 Markdown 文件目录内的资源
+- CSV 表格阅读与编辑：分隔符切换、首行表头、Excel/WPS 式勾选筛选、数值与文本排序、无分页虚拟滚动、行列增删、单元格编辑和列统计
+- CSV 编码读取与写回：UTF-8、UTF-8 BOM、UTF-16LE/BE、GB18030、GBK、BIG5，支持按编码重新读取和另存编码转换
 - 选中文字可使用 MarkText 原生的粗体、斜体、下划线、删除线、高亮、链接、行内代码和清除格式工具
-- 新建 Markdown / XML 文件、全屏标签阅读、Markdown 基础阅读样式
+- 新建 Markdown / XML / CSV 文件、全屏标签阅读、Markdown 基础阅读样式
 - Markdown 基础样式可单独调整左侧大纲的字体、字号和字重
 - 自适应窗口布局、缩放、标签页右键菜单
-- Windows `.xml` / `.md` / `.markdown` 文件关联、命令行/双击打开、单实例转交
+- Windows `.xml` / `.md` / `.markdown` / `.csv` 文件关联、命令行/双击打开、单实例转交
 - GitHub 项目链接跳转
-- Tauri Updater v2 签名更新与 GitHub Release `latest.json`
+- Tauri Updater v2 签名更新，Gitee 更新源优先、GitHub Release 自动兜底
 - “默认应用设置”会注册 Windows 默认应用候选并打开系统设置；Windows 不允许程序静默绕过用户选择默认应用
 
 ## 快速开始
@@ -44,6 +46,9 @@ npm run tauri dev
 cd tauri-app
 npm run check
 npm run test:layout
+npm run test:csv-ui
+npm run test:csv-e2e
+npm run test:csv-large-e2e
 ```
 
 真实 SCL 目录测试可按 `tauri-app/README.md` 中的说明通过 `XML_VIEWER_TEST_DIR` 运行。
