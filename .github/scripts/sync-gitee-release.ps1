@@ -58,25 +58,38 @@ try {
   $release = Invoke-RestMethod -Method Get -Uri $releaseUri -TimeoutSec 30
 } catch {
   Write-Host "Gitee release does not exist yet; creating $tag."
+  $createUri = "$repoApi/releases?access_token=$token"
   $createBody = @{
-    access_token = $token
     tag_name = $tag
     name = "XML / Markdown / CSV 编辑器 $tag"
     body = "Gitee mirror release for $tag. Installer and updater signature are mirrored from the GitHub release."
     prerelease = "false"
     target_commitish = "master"
   }
-  try {
-    $release = Invoke-RestMethod -Method Post -Uri "$repoApi/releases" -Body $createBody -ContentType "application/x-www-form-urlencoded" -TimeoutSec 30
-  } catch {
-    $detail = $_.ErrorDetails.Message
-    if ([string]::IsNullOrWhiteSpace($detail)) { $detail = $_.Exception.Message }
-    throw "Gitee release creation failed: $detail"
+  $createStatus = 0
+  $createResponse = Invoke-WebRequest -Method Post -Uri $createUri -Body $createBody -ContentType "application/x-www-form-urlencoded" -SkipHttpErrorCheck -StatusCodeVariable createStatus -TimeoutSec 30
+  if ($createStatus -lt 200 -or $createStatus -ge 300) {
+    throw "Gitee release creation failed with HTTP ${createStatus}: $($createResponse.Content)"
+  }
+  $responseText = [string]$createResponse.Content
+  if (-not [string]::IsNullOrWhiteSpace($responseText)) {
+    try { $release = $responseText | ConvertFrom-Json } catch { $release = $null }
   }
 }
-if (-not $release.id) {
-  $responsePreview = ($release | ConvertTo-Json -Depth 8 -Compress)
-  throw "Unexpected Gitee release response for ${tag}: $responsePreview"
+
+if (-not $release -or -not $release.id) {
+  for ($attempt = 1; $attempt -le 5; $attempt += 1) {
+    Start-Sleep -Seconds 2
+    try {
+      $release = Invoke-RestMethod -Method Get -Uri $releaseUri -TimeoutSec 30
+      if ($release -and $release.id) { break }
+    } catch {
+      $release = $null
+    }
+  }
+}
+if (-not $release -or -not $release.id) {
+  throw "Unable to resolve the Gitee release ID for $tag after creation"
 }
 
 $attachmentsUri = "$repoApi/releases/$($release.id)/attach_files"
