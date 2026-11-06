@@ -66,12 +66,25 @@ try {
     prerelease = "false"
     target_commitish = "master"
   }
-  $createStatus = 0
-  $createResponse = Invoke-WebRequest -Method Post -Uri $createUri -Body $createBody -ContentType "application/x-www-form-urlencoded" -SkipHttpErrorCheck -StatusCodeVariable createStatus -TimeoutSec 30
-  if ($createStatus -lt 200 -or $createStatus -ge 300) {
-    throw "Gitee release creation failed with HTTP ${createStatus}: $($createResponse.Content)"
+  $createOutput = & curl.exe -sS -X POST $createUri `
+    -F "tag_name=$tag" `
+    -F "name=XML / Markdown / CSV 编辑器 $tag" `
+    -F "body=Gitee mirror release for $tag. Installer and updater signature are mirrored from the GitHub release." `
+    -F "prerelease=false" `
+    -F "target_commitish=master" `
+    -w "`n%{http_code}"
+  $createExit = $LASTEXITCODE
+  $createText = ($createOutput | Out-String).TrimEnd()
+  $lastNewline = $createText.LastIndexOf("`n")
+  if ($lastNewline -lt 0) {
+    throw "Gitee release creation returned an unexpected response: $createText"
   }
-  $responseText = [string]$createResponse.Content
+  $createStatus = [int]$createText.Substring($lastNewline + 1).Trim()
+  $responseText = $createText.Substring(0, $lastNewline).Trim()
+  Write-Host "Gitee release create HTTP status: $createStatus"
+  if ($createExit -ne 0 -or $createStatus -lt 200 -or $createStatus -ge 300) {
+    throw "Gitee release creation failed with HTTP ${createStatus}: $responseText"
+  }
   if (-not [string]::IsNullOrWhiteSpace($responseText)) {
     try { $release = $responseText | ConvertFrom-Json } catch { $release = $null }
   }
