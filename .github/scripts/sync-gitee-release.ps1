@@ -57,6 +57,7 @@ $release = $null
 try {
   $release = Invoke-RestMethod -Method Get -Uri $releaseUri -TimeoutSec 30
 } catch {
+  Write-Host "Gitee release does not exist yet; creating $tag."
   $createBody = @{
     access_token = $token
     tag_name = $tag
@@ -65,10 +66,17 @@ try {
     prerelease = "false"
     target_commitish = "master"
   }
-  $release = Invoke-RestMethod -Method Post -Uri "$repoApi/releases" -Body $createBody -ContentType "application/x-www-form-urlencoded" -TimeoutSec 30
+  try {
+    $release = Invoke-RestMethod -Method Post -Uri "$repoApi/releases" -Body $createBody -ContentType "application/x-www-form-urlencoded" -TimeoutSec 30
+  } catch {
+    $detail = $_.ErrorDetails.Message
+    if ([string]::IsNullOrWhiteSpace($detail)) { $detail = $_.Exception.Message }
+    throw "Gitee release creation failed: $detail"
+  }
 }
 if (-not $release.id) {
-  throw "Unable to create or read the Gitee release for $tag"
+  $responsePreview = ($release | ConvertTo-Json -Depth 8 -Compress)
+  throw "Unexpected Gitee release response for ${tag}: $responsePreview"
 }
 
 $attachmentsUri = "$repoApi/releases/$($release.id)/attach_files"
